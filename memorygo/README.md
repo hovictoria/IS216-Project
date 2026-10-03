@@ -1,143 +1,69 @@
-# Memory Go 🧠🗺️
+# memorygo
 
-**Memory Go** is an interactive exploration and cognitive game designed for older adults. Users can explore a map, travel to different stations, complete cognitive mini-games, collect characters and items, and progress through different areas.
+This template should help get you started developing with Vue 3 in Vite.
 
-## 🎮 How the Game Works
+## Recommended IDE Setup
 
-The main gameplay loop is:
+[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
 
-**Explore the Map → Reach a Station → Complete a Mini-Game → Earn Rewards → Collect Items → Unlock New Areas**
+## Recommended Browser Setup
 
-Each station contains a different cognitive challenge, such as:
+- Chromium-based browsers (Chrome, Edge, Brave, etc.):
+  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
+  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
+- Firefox:
+  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
+  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
 
-* 🧠 Memory matching
-* 🔢 Sequence recall
-* 🧩 Pattern recognition
-* 👀 Object identification
+## Customize configuration
 
-Successfully completing a challenge allows users to earn **XP, coins, and collectible items**.
+See [Vite Configuration Reference](https://vite.dev/config/).
 
-## ✨ Features
+## Project Setup
 
-* 🗺️ **Interactive Map** – Explore different areas and move your character around the map.
-* 📍 **Station System** – Visit different stations to access unique challenges.
-* 🎮 **Cognitive Mini-Games** – Complete memory and puzzle-based challenges.
-* 👤 **User Profile** – View your level, XP, coins, and overall progress.
-* 👻 **Character Collection** – Collect Memory Spirits, animals, flowers, landmarks, and other items.
-* 🏆 **Rewards System** – Earn XP, coins, and collectibles by completing challenges.
-* 🔓 **Progression System** – Level up and unlock new stations and areas.
-
-## 🛠️ Technologies Used
-
-* Vue.js
-* JavaScript
-* HTML
-* CSS
-* Bootstrap
-* Vite
-* pnpm
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-Before running the project, make sure you have the following installed:
-
-* [Node.js](https://nodejs.org/)
-* pnpm
-* Google Chrome
-
-### 1. Clone the Repository
-
-Clone this repository to your local machine:
-
-```bash
-git clone <repository-url>
-```
-
-Navigate into the project folder:
-
-```bash
-cd <project-folder>
-```
-
-### 2. Install Dependencies
-
-Install the required dependencies using pnpm:
-
-```bash
+```sh
 pnpm install
 ```
 
-### 3. Start the Development Server
+### Compile and Hot-Reload for Development
 
-Run the following command:
-
-```bash
+```sh
 pnpm dev
 ```
 
-The development server should start and display a local URL similar to:
+### Compile and Minify for Production
 
-```text
-http://localhost:5173/
+```sh
+pnpm build
 ```
 
-### 4. Open the Website
+### Run Unit Tests with [Vitest](https://vitest.dev/)
 
-Open **Google Chrome** and go to:
-
-```text
-http://localhost:5173/
+```sh
+pnpm test:unit
 ```
 
-The Memory Go website should now be running locally.
+### Run End-to-End Tests with [Playwright](https://playwright.dev)
 
-## 📁 Project Structure
+```sh
+# Install browsers for the first run
+npx playwright install
 
-```text
-Memory-Go/
-├── public/
-├── src/
-│   ├── assets/
-│   ├── components/
-│   ├── views/
-│   ├── App.vue
-│   └── main.js
-├── index.html
-├── package.json
-└── README.md
+# When testing on CI, must build the project first
+pnpm build
+
+# Runs the end-to-end tests
+pnpm test:e2e
+# Runs the tests only on Chromium
+pnpm test:e2e --project=chromium
+# Runs the tests of a specific file
+pnpm test:e2e tests/example.spec.ts
+# Runs the tests in debug mode
+pnpm test:e2e --debug
 ```
 
-> The exact project structure may vary depending on the components and features implemented by the team.
+### Lint with [ESLint](https://eslint.org/)
 
-## 👥 Project Team
-
-| Member   | Main Feature                     |
-| -------- | -------------------------------- |
-| Member 1 | 🗺️ Interactive Map              |
-| Member 2 | 🎮 Cognitive Mini-Games          |
-| Member 3 | 👤 User Profile & Progress       |
-| Member 4 | 👻 Character & Collection System |
-| Member 5 | 📍 Stations & Rewards            |
-| Member 6 | 🔓 Level & Area Unlocking        |
-
-## 📌 Development Notes
-
-This project is currently intended to be run locally using the Vite development server.
-
-To start the project:
-
-```bash
-pnpm dev
+```sh
+pnpm lint
 ```
-
-Then access the application through:
-
-```text
-http://localhost:5173/
-```
-
-## 🎯 Project Goal
-
-Memory Go aims to combine **exploration, physical activity, cognitive challenges, and gamification** into an engaging experience for older adults. By providing different stations and rewarding users for completing challenges, the application encourages users to explore and stay mentally active.
