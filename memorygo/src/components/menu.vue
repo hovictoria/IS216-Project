@@ -16,7 +16,11 @@
                 <li class="nav-item"><router-link to="/collection" class="nav-link">Collection</router-link></li>
             </ul>
             <hr>
-            <button class="btn btn-primary">Read pages aloud</button>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="flexSwitchCheckDefault">
+                <label class="form-check-label" for="flexSwitchCheckDefault">Read pages aloud</label>
+            </div>
+
         </div>
         
         <aside>
