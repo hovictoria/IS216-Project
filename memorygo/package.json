@@ -15,9 +15,12 @@
     "format": "prettier --write --experimental-cli src/"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
+    "@tresjs/core": "^5.9.3",
     "axios": "^1.20.0",
     "bootstrap": "^5.3.8",
     "pinia": "^4.0.3",
+    "three": "^0.186.1",
     "vue": "^3.5.42",
     "vue-router": "^5.3.1"
   },
