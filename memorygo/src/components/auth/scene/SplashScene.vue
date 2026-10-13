@@ -1,3 +1,10 @@
+<!--------------------------------------------------------------------------------------------------------
+PSEUDOCODE
+filename:   components/auth/scene/SplashScene.vue 
+purpose:    A shell of the complete landing page 3D diagram done via tresjs.
+imports:    imports SplashMap.vue; TreasureChest.vue
+---------------------------------------------------------------------------------------------------------->
+
 <script setup>
 // The WebGL canvas for the splash screen: camera, renderer settings, map and chest.
 import { computed, onMounted, onUnmounted, ref } from 'vue'
