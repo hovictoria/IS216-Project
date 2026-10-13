@@ -6,7 +6,7 @@
 <template>
     <body>
         <div class="d-flex flex-column flex-shrink-0 p-3 bg-body-tertiary vh-100" style="width: 250px;">
-            <router-link to="/" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto link-body-emphasis text-decoration-none"><span class="fs-4">Memory Go</span></router-link>
+            <router-link to="/menu" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto link-body-emphasis text-decoration-none"><span class="fs-4">Memory Go</span></router-link>
             <hr>
             <ul class="nav nav-pills flex-column mb-auto">
                 <li class="nav-item"><router-link to="/" class="nav-link active">Home</router-link></li>
