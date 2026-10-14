@@ -1,9 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
 /* Auth - Landing, Login, SignUp */
 import landing from "@/components/auth/landing.vue"
 import login from "@/components/auth/login.vue"
 
+/* Home Page menu dashboard */
 import menu from "../components/menu.vue"
 
 /* Games */
@@ -29,12 +31,30 @@ const router = createRouter({
       component: login
     },
 
-    // The following routes are for xxx
+    // The following route are for menu dashboard
     {
       path: "/menu",
-      component: menu
+      component: menu,
+      meta: { requiresAuth: true }
     }
+
   ],
+})
+
+// Runs before every page change. 'to' is where the user is trying to go
+router.beforeEach((to) => {
+  const auth = useAuthStore() // here we are using auth's const isLoggedIn
+
+  // Logged out and heading somewhere protected: directed to sign in first
+  if (to.meta.requiresAuth && !auth.isLoggedIn) {
+    return '/login'
+  }
+
+  // Already logged in: skip the landing & login page (goes straight to menu dashboard)
+  if ((to.path === '/login' || to.path === '/') && auth.isLoggedIn) {
+    return '/menu'
+  }
+
 })
 
 export default router
