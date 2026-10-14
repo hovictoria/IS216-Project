@@ -81,7 +81,7 @@ const instruction = computed(() => {
   <div class="game-page">
 
         <div class="game-header">
-            <button class="back-button">← Back</button>
+            <button class="back-button"><router-link to="/games" class="nav-link active">← Back</router-link></button>
             <div class="game-title">🌸 Memory Garden</div>
         </div>
 

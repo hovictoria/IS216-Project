@@ -9,7 +9,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 
 // Import Bootstrap JS (npm install bootstrap)
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
-
+import '@fortawesome/fontawesome-free/css/all.min.css'
 const app = createApp(App)
 
 app.use(createPinia())

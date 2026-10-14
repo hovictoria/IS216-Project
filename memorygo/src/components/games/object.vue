@@ -80,7 +80,7 @@ function restartGame() {
   <div class="game-page">
 
         <div class="game-header">
-            <a class="back-button btn" href="/games">← Back</a>
+            <button class="back-button"><router-link to="/games" class="nav-link active">← Back</router-link></button>
             <div class="game-title">🌸 Memory Garden</div>
         </div>
 
