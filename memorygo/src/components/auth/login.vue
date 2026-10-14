@@ -3,12 +3,19 @@ PSEUDOCODE
 filename:   components/auth/login.vue 
 purpose:    - login page -> when user visits ('/login'). Configure the card within </slot> in AuthLayout.vue
             - handles the user login input form
-imports:    imports AuthLayout.vue
+            - function onSubmit handles the routing to menu or displaying error via useAuthStore function
+imports:    imports AuthLayout.vue, useAuthStore functions from src/stores/auth
 ---------------------------------------------------------------------------------------------------------->
 
 <script setup>
     import { ref } from 'vue'
+    import { useRouter } from 'vue-router'
+    import { useAuthStore } from '@/stores/auth.js';
+
     import AuthLayout from './AuthLayout.vue';
+
+    const router = useRouter()
+    const auth = useAuthStore()
 
     // User Login Inputs
     const email = ref('')
@@ -24,14 +31,19 @@ imports:    imports AuthLayout.vue
         loading.value = true
         error.value = ''
 
-        // FAKE for now. Step 6 replaces this block with the real call.
-        await new Promise(r => setTimeout(r, 800))      // pretend the network took 0.8s
-        if (password.value !== 'test') {
-            error.value = "That email or password doesn't match. Please try again."
-        }
+        // Ask the store to sign in. Returns null on success, or an error message to show
+        const message = await auth.signIn(email.value.trim(), password.value)
 
+        // resets const variables
         password.value = ''
         loading.value = false
+
+        // If there is an error upon sign in (useAuthStore would return an error message upon sign in, else null if success)
+        if (message) {
+            error.value = message       
+        } else {
+            router.push('/menu')    // no error. signed in: go to the main menu
+        }
     }
 </script>
 
