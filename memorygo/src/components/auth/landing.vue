@@ -21,9 +21,9 @@ const tagline = 'As you are travelling, play cognitive games and collect Spirits
             Start exploring
         </button>
 
-        <button type="button" class="account-link d-block mx-auto mt-3 border-0 bg-transparent">
+        <router-link to="/login" class="account-link d-block mx-auto mt-3 border-0 bg-transparent">
             I already have an account
-        </button>
+        </router-link>
     </AuthLayout>
 </template>
 
