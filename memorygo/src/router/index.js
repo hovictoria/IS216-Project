@@ -18,6 +18,8 @@ import pattern from "../components/games/pattern.vue"
 import missing from "../components/games/missing.vue"
 import oddoneout from "../components/games/oddoneout.vue"
 
+/* Collection */
+import collection from "../components/charactercollection.vue"
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -41,6 +43,39 @@ const router = createRouter({
       path: "/menu",
       component: main,
       meta: { requiresAuth: true }
+    },
+    {
+      path: "/spirits",
+      component: collection,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: "/games",
+      component: games
+    },
+    {
+      path: "/object",
+      component: object
+    },
+    {
+      path: "/memory",
+      component: memory
+    },
+    {
+      path: "/sequence",
+      component: sequence
+    },
+    {
+      path: "/pattern",
+      component: pattern
+    },
+    {
+      path: "/missing",
+      component: missing
+    },
+    {
+      path: "/oddoneout",
+      component: oddoneout
     }
 
   ],
