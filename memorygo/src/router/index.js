@@ -31,7 +31,7 @@ const router = createRouter({
       component: map
     },
     {
-      path: "/collection",
+      path: "/spirits",
       component: collection
     },
     {
