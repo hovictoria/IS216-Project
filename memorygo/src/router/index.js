@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import menu from "../components/menu.vue"
+import main from "../views/main.vue"
 import profile from "../components/profile.vue"
 import games from "../components/games/games.vue"
 import map from "../components/map.vue"
@@ -16,7 +16,7 @@ const router = createRouter({
   routes: [
     {
       path: "/",
-      component: menu
+      component: main
     },
     {
       path: "/profile",
