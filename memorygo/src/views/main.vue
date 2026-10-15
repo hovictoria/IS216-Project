@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch } from "vue";
-import AppMenu from "@/components/Menu.vue";
+import AppMenu from "@/components/menu.vue";
 import heroImg from "@/assets/bg.png";
 
 /* ---------- Data (replace with real data from your store / API) ---------- */

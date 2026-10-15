@@ -1,11 +1,23 @@
 <script setup>
+import { useRouter } from "vue-router";
+import { useAuthStore } from "@/stores/auth";
+
 defineProps({
   readAloud: { type: Boolean, default: false },
 });
 const emit = defineEmits(["update:readAloud"]);
 
+const router = useRouter();
+const auth = useAuthStore();
+
+// Sign out: clear the Supabase session (store sets user to null), then back to the landing page
+async function onSignOut() {
+  await auth.signOut();
+  router.push("/");
+}
+
 const navItems = [
-  { to: "/", label: "Today", icon: "fa-sun" },
+  { to: "/menu", label: "Today", icon: "fa-sun" },
   { to: "/map", label: "Map", icon: "fa-map" },
   { to: "/spirits", label: "Spirits", icon: "fa-wand-sparkles" },
   { to: "/me", label: "Me", icon: "fa-user" },
@@ -19,12 +31,12 @@ const navItems = [
       <path d="M16 38C16 38 3 24 3 15a13 13 0 0 1 26 0c0 9-13 23-13 23Z" fill="var(--terracotta)" />
       <rect x="10" y="9" width="12" height="12" rx="2" fill="var(--card)" />
     </svg>
-    <router-link to="/" class="brand">Memory Go</router-link>
+    <router-link to="/menu" class="brand">Memory Go</router-link>
   </header>
 
   <!-- Desktop sidebar -->
   <aside class="sidebar d-none d-md-flex flex-column">
-    <router-link to="/" class="d-flex align-items-center gap-2 mb-4 text-decoration-none">
+    <router-link to="/menu" class="d-flex align-items-center gap-2 mb-4 text-decoration-none">
       <svg class="brand-pin" viewBox="0 0 32 40" aria-hidden="true">
         <path d="M16 38C16 38 3 24 3 15a13 13 0 0 1 26 0c0 9-13 23-13 23Z" fill="var(--terracotta)" />
         <rect x="10" y="9" width="12" height="12" rx="2" fill="var(--card)" />
@@ -63,6 +75,10 @@ const navItems = [
         <i class="fa-regular fa-circle-question" aria-hidden="true"></i>
         <span>Help and how to play</span>
       </router-link>
+      <button type="button" class="help-link mt-2 border-0 bg-transparent p-0" @click="onSignOut">
+        <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+        <span>Sign out</span>
+      </button>
     </div>
   </aside>
 
