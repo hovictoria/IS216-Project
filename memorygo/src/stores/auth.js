@@ -8,6 +8,21 @@
 // imports:    imports supabase to use supabase methods. Imports defineStore from pinia
 // ----------------------------------------------------------------------------------------------------------
 
+// ----------------------------------------------------------------------------------------------------------
+// useAuthStore()
+//  1. const user
+//      - returns a Supabase user object [null when logged out]
+//  2. const isLoggedIn
+//      - a boolean variable to check if a user isLoggedIn
+//      - used in src/router/index.js to check if there is a protected guard for that page whenever the user switches page, 'to'
+//  3. function init()
+//      - function to check if user has a saved session
+//      - used in main.js before app runs to check if the user has a stored saved session within the browser
+//  4. function signIn()
+//      - function to signIn 
+//      - used in login.vue for user error validation during signIn
+// ----------------------------------------------------------------------------------------------------------
+
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { supabase } from '@/lib/supabase'
@@ -36,6 +51,28 @@ export const useAuthStore = defineStore('auth', () => {
         return "That email or password doesn't match. Please try again"
     }
 
+    // Helps with the signUp
+    // Returns null on success, or a friendly message to show the user.
+    async function signUp(email, password, displayName) {
+        const { error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: { data: { display_name: displayName } },   // saved on the user, readable later
+        })
+        if (!error) return null
+
+        if (error.message.toLowerCase().includes('password')) {
+            return 'Please choose a longer password (at least 6 characters).'
+        }
+        return "We couldn't create your account. Please check your details and try again."
+    }
+
+    // Helps with the signOut
+    async function signOut() {
+        await supabase.auth.signOut()
+        user.value = null
+    }
+
     // session listener
     // getSession() reads the saved session back by looking in localStorage to check if there is a user or not
     async function init() {
@@ -48,5 +85,5 @@ export const useAuthStore = defineStore('auth', () => {
         })
     }
 
-    return { user, isLoggedIn, init, signIn}
+    return { user, isLoggedIn, init, signIn, signUp, signOut }
 })

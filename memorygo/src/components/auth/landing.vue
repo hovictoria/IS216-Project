@@ -17,9 +17,9 @@ const tagline = 'As you are travelling, play cognitive games and collect Spirits
         <!-- items within </slot> -->
         <p class="tagline text-center mt-3 mb-4">{{ tagline }}</p>
 
-        <button type="button" class="start-btn w-100 rounded-4 border-0">
+        <router-link to="/signup" class="start-btn d-flex align-items-center justify-content-center w-100 rounded-4">
             Start exploring
-        </button>
+        </router-link>
 
         <router-link to="/login" class="account-link d-block text-center mt-3">
             I already have an account
@@ -38,12 +38,14 @@ const tagline = 'As you are travelling, play cognitive games and collect Spirits
     /* primary button */
     .start-btn {
         min-height: 64px;
+        text-decoration: none;        /* it's a link now, so no underline */
         background: #b5492a;
         color: #fff;
         box-shadow: 0 5px 0 #8a3519;
         font-size: 1.25rem;
         font-weight: 800;
         cursor: pointer;
+        text-decoration: none;
     }
 
     .start-btn:hover {

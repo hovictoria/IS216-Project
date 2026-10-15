@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/auth'
 /* Auth - Landing, Login, SignUp */
 import landing from "@/components/auth/landing.vue"
 import login from "@/components/auth/login.vue"
+import signup from "@/components/auth/signup.vue"
 
 /* Home Page menu dashboard */
 import menu from "../components/menu.vue"
@@ -30,6 +31,10 @@ const router = createRouter({
       path: "/login",
       component: login
     },
+    {
+      path: "/signup",
+      component: signup
+    },
 
     // The following route are for menu dashboard
     {
@@ -51,7 +56,7 @@ router.beforeEach((to) => {
   }
 
   // Already logged in: skip the landing & login page (goes straight to menu dashboard)
-  if ((to.path === '/login' || to.path === '/') && auth.isLoggedIn) {
+  if ((to.path === '/login' || to.path === '/' || to.path === '/signup') && auth.isLoggedIn) {
     return '/menu'
   }
 

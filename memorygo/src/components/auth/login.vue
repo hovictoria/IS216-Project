@@ -83,7 +83,7 @@ imports:    imports AuthLayout.vue, useAuthStore functions from src/stores/auth
             <!-- Sign Up Button -->
             <p class="signup">
                 New to Memory Go?
-                <button type="button" class="link">Create an account</button>
+                <router-link to="/signup" class="link">Create an account</router-link>
             </p>
         </form>
     </AuthLayout>
@@ -213,6 +213,8 @@ imports:    imports AuthLayout.vue, useAuthStore functions from src/stores/auth
     }
 
     .link {
+        display: inline-flex;         /* a link is not a button: centre its text ourselves */
+        align-items: center;
         min-height: 44px;
         padding: 0 4px;
         border: 0;

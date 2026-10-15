@@ -1,4 +1,16 @@
 <script setup>
+    import { useRouter } from 'vue-router'
+    import { useAuthStore } from '@/stores/auth'
+
+    const router = useRouter()
+    const auth = useAuthStore()
+
+    // Sign out: clear the Supabase session (store sets user to null), then back to the landing page
+    async function onSignOut() {
+        await auth.signOut()
+        router.push('/')
+    }
+
     const username="username";
     const date=new Date();
     const weekday = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
@@ -20,6 +32,8 @@
                 <input class="form-check-input" type="checkbox" role="switch" id="flexSwitchCheckDefault">
                 <label class="form-check-label" for="flexSwitchCheckDefault">Read pages aloud</label>
             </div>
+
+            <button type="button" class="btn btn-outline-secondary mt-3" @click="onSignOut">Sign out</button>
 
         </div>
         

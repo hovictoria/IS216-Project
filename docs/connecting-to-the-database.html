@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Memory Go Database Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,700,100,1&family=Nunito:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream: #fbf4e4; --card: #fffbf2; --border: #e3d6b8;
+    --ink: #2a2017; --muted: #4d4134;
+    --terra: #b5492a; --terra-dark: #8a3519;
+    --blue: #2f668f; --green: #3c784d; --gold: #f3c54b;
+    --code-bg: #f3ecdc;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--cream); color: var(--ink); font-family: 'Nunito', system-ui, sans-serif; font-size: 17px; line-height: 1.6; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 32px 16px 80px; }
+  h1 { font-family: 'Fraunces', Georgia, serif; font-variation-settings: 'SOFT' 100, 'WONK' 1; font-size: clamp(2.2rem, 6vw, 3.2rem); line-height: 1.05; color: var(--terra); margin: 0 0 8px; }
+  h2 { font-family: 'Fraunces', Georgia, serif; font-variation-settings: 'SOFT' 100, 'WONK' 1; font-size: 1.8rem; margin: 56px 0 12px; scroll-margin-top: 80px; }
+  h3 { font-size: 1.15rem; margin: 28px 0 8px; color: var(--blue); }
+  p { margin: 0 0 14px; }
+  .sub { color: var(--muted); font-size: 1.1rem; margin-bottom: 28px; }
+  nav.toc { position: sticky; top: 0; z-index: 5; background: var(--cream); border-bottom: 2px solid var(--border); padding: 10px 16px; margin: 0 -16px 24px; display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.95rem; font-weight: 700; }
+  nav.toc a { color: var(--blue); text-decoration: none; }
+  nav.toc a:hover { text-decoration: underline; }
+  .card { background: var(--card); border: 2px solid var(--border); border-radius: 18px; padding: 20px 22px; margin: 16px 0; box-shadow: 0 16px 32px -24px rgba(74,52,30,.4); }
+  .note { border-left: 5px solid var(--gold); background: var(--card); padding: 12px 16px; border-radius: 0 12px 12px 0; margin: 16px 0; }
+  .note b { color: var(--terra-dark); }
+  .warn { border-left-color: var(--terra); }
+  code, pre { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.9em; }
+  code { background: var(--code-bg); padding: 2px 6px; border-radius: 6px; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; overflow-x: auto; margin: 10px 0 18px; line-height: 1.5; }
+  pre code { background: none; padding: 0; }
+  .c { color: #7a6a52; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 0.97rem; }
+  th, td { text-align: left; padding: 10px 12px; border: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--card); }
+  .flow { display: flex; flex-direction: column; margin: 20px 0 28px; }
+  .step { display: grid; grid-template-columns: 56px 1fr; gap: 14px; align-items: start; background: var(--card); border: 2px solid var(--border); border-radius: 16px; padding: 14px 18px; }
+  .step .n { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 1.1rem; background: var(--terra); }
+  .step.client .n { background: var(--blue); }
+  .step.server .n { background: var(--terra); }
+  .step.supa .n { background: var(--green); }
+  .step .where { font-size: .85rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  .step .what { font-weight: 800; font-size: 1.05rem; margin: 2px 0 4px; }
+  .step .why { color: var(--muted); font-size: .97rem; }
+  .arrow { height: 26px; display: grid; place-items: center; color: var(--muted); font-size: 1.3rem; }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px 18px; font-size: .9rem; margin: 6px 0 18px; }
+  .legend span::before { content: ''; display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+  .legend .l-client::before { background: var(--blue); }
+  .legend .l-server::before { background: var(--terra); }
+  .legend .l-supa::before { background: var(--green); }
+  .tree { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .9rem; line-height: 1.55; white-space: pre; overflow-x: auto; }
+  .tree b { color: var(--blue); }
+  .tree i { color: var(--muted); font-style: normal; }
+  ol.big > li { margin-bottom: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Memory Go: connecting to the database</h1>
+<p class="sub">How a page reads and saves data, and how to add your own feature. Worked example: the <code>progress</code> table (xp and coins).</p>
+
+<nav class="toc">
+  <a href="#picture">The picture</a>
+  <a href="#setup">Setup once</a>
+  <a href="#rules">Three rules</a>
+  <a href="#read">Read from a page</a>
+  <a href="#save">Save from a page</a>
+  <a href="#feature">Add your own feature</a>
+  <a href="#test">Testing</a>
+  <a href="#errors">Common errors</a>
+</nav>
+
+<div class="note"><b>In one sentence.</b> Pages call <code>api.get(...)</code> / <code>api.post(...)</code>. Our Express server checks who is asking, talks to Supabase, and sends JSON back. Pages never talk to Supabase directly for data.</div>
+
+<!-- =================================================================== -->
+<h2 id="picture">The picture</h2>
+
+<div class="legend">
+  <span class="l-client">your page (browser)</span>
+  <span class="l-server">our server (Express)</span>
+  <span class="l-supa">Supabase (database)</span>
+</div>
+
+<div class="flow">
+  <div class="step client"><div class="n">1</div><div>
+    <div class="where">menu.vue / profile.vue / any page</div>
+    <div class="what">const { data } = await api.get('/progress')</div>
+    <div class="why"><code>api</code> is a pre-configured axios from <code>@/lib/api</code>. It knows the server's address and attaches the logged-in user's token automatically. You never handle tokens.</div>
+  </div></div>
+  <div class="arrow">↓</div>
+  <div class="step server"><div class="n">2</div><div>
+    <div class="where">server/middleware/auth.js</div>
+    <div class="what">requireAuth checks the token → sets req.user</div>
+    <div class="why">Asks Supabase who the token belongs to. No token or a bad one gets a 401 and the route never runs. After this, <code>req.user.id</code> is trustworthy.</div>
+  </div></div>
+  <div class="arrow">↓</div>
+  <div class="step server"><div class="n">3</div><div>
+    <div class="where">server/routes/progress.js</div>
+    <div class="what">supabase.from('progress').select(...).eq('user_id', req.user.id)</div>
+    <div class="why">The route does the query, always filtered to the asking user. Game rules (how much XP a game awards) live here, not in the browser.</div>
+  </div></div>
+  <div class="arrow">↓</div>
+  <div class="step supa"><div class="n">4</div><div>
+    <div class="where">Supabase</div>
+    <div class="what">Returns the rows</div>
+    <div class="why">Postgres table with Row Level Security on. Even if someone bypassed our server, RLS only lets a user read their own rows.</div>
+  </div></div>
+  <div class="arrow">↓</div>
+  <div class="step client"><div class="n">5</div><div>
+    <div class="where">your page</div>
+    <div class="what">progress.value = data</div>
+    <div class="why">Put it in a ref, the template updates.</div>
+  </div></div>
+</div>
+
+<div class="card tree">IS216-Project/
+├── memorygo/                         <i>CLIENT</i>
+│   ├── .env.local                    <i>VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY (gitignored)</i>
+│   └── src/
+│       ├── lib/<b>api.js</b>                <i>← pages import { api } from here</i>
+│       ├── lib/supabase.js           <i>login only, you won't touch it</i>
+│       └── stores/auth.js            <i>auth.user, auth.isLoggedIn if you need them</i>
+└── server/                           <i>API</i>
+    ├── .env                          <i>SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (gitignored)</i>
+    ├── server.js                     <i>mounts each routes file: app.use('/api/xxx', xxxRoutes)</i>
+    ├── supabase.js                   <i>the server's Supabase client</i>
+    ├── middleware/auth.js            <i>requireAuth</i>
+    └── routes/
+        ├── me.js                     <i>GET /api/me</i>
+        └── <b>progress.js</b>               <i>GET /api/progress, POST /api/progress/xp  ← copy this for your feature</i></div>
+
+<!-- =================================================================== -->
+<h2 id="setup">Setup once, on your machine</h2>
+<ol class="big">
+  <li><b>Get the env values from Ariq privately</b> (not from git, not from the group chat). Two files, each has an <code>.env.example</code> next to it showing the names:
+    <pre><code><span class="c"># memorygo/.env.local</span>
+VITE_SUPABASE_URL=
+VITE_SUPABASE_PUBLISHABLE_KEY=
+
+<span class="c"># server/.env</span>
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+PORT=8000
+CLIENT_ORIGIN=http://localhost:5173</code></pre>
+  </li>
+  <li><b>Install both halves:</b>
+    <pre><code>cd IS216-Project/memorygo && pnpm install
+cd IS216-Project/server   && pnpm install</code></pre>
+  </li>
+  <li><b>Run both, in two terminals:</b>
+    <pre><code>cd IS216-Project/server   && pnpm dev     <span class="c"># API on http://127.0.0.1:8000</span>
+cd IS216-Project/memorygo && pnpm dev     <span class="c"># site on http://localhost:5173</span></code></pre>
+  </li>
+  <li><b>Sign up once</b> at <code>/signup</code> so you have a user to test with. Every page except landing/login/signup is behind the login.</li>
+</ol>
+
+<div class="note warn"><b>Never</b> put <code>SUPABASE_SERVICE_ROLE_KEY</code> anywhere in <code>memorygo/</code>. It bypasses all database security. It lives only in <code>server/.env</code>.</div>
+
+<!-- =================================================================== -->
+<h2 id="rules">Three rules</h2>
+<table>
+  <tr><th>Rule</th><th>Why</th></tr>
+  <tr><td>Pages call <code>api.get</code> / <code>api.post</code>, never <code>supabase.from(...)</code>.</td><td>The server is where "who is asking" is verified and where game rules live. Calling Supabase from the browser skips both.</td></tr>
+  <tr><td>Every route starts with <code>requireAuth</code> and filters by <code>req.user.id</code>.</td><td>The server's key can read anyone's rows. The filter is what keeps users in their own lane.</td></tr>
+  <tr><td>The browser says <i>what happened</i>, the server decides <i>what it's worth</i>.</td><td><code>{ game: 'memory' }</code>, not <code>{ xp: 5000 }</code>. A player with DevTools can't award themselves anything.</td></tr>
+</table>
+
+<!-- =================================================================== -->
+<h2 id="read">Read data from a page</h2>
+<p>This is the lab's <code>loadData</code> pattern. Same shape, with the URL and token handled for you.</p>
+<pre><code><span class="c">&lt;!-- any page, e.g. menu.vue or profile.vue --&gt;</span>
+&lt;script setup&gt;
+import { ref, onMounted } from 'vue'
+import { api } from '@/lib/api'
+
+const progress = ref({ xp: 0, coins: 0 })   <span class="c">// placeholder until the server answers</span>
+const loadError = ref('')
+
+async function loadProgress() {
+    try {
+        const { data } = await api.get('/progress')   <span class="c">// GET http://127.0.0.1:8000/api/progress</span>
+        progress.value = data
+    } catch {
+        loadError.value = "Couldn't load your progress."
+    }
+}
+
+onMounted(loadProgress)   <span class="c">// once, when the page appears</span>
+&lt;/script&gt;
+
+&lt;template&gt;
+    &lt;p v-if="loadError" class="text-danger"&gt;{{ loadError }}&lt;/p&gt;
+    &lt;p v-else&gt;XP: {{ progress.xp }} · Coins: {{ progress.coins }}&lt;/p&gt;
+&lt;/template&gt;</code></pre>
+<ul>
+  <li><b>The ref starts with zeros</b> so there's no flash of "undefined" before the reply.</li>
+  <li><b><code>onMounted</code></b> runs once when the component is on screen. Right place to fetch.</li>
+  <li><b><code>try/catch</code></b> handles a server that's down or a session that expired. Show a sentence, don't crash.</li>
+  <li><b><code>.data</code></b> is the JSON body. axios wraps replies with status and headers you don't need here.</li>
+</ul>
+
+<!-- =================================================================== -->
+<h2 id="save">Save data from a page</h2>
+<p>Tell the server what happened. It works out the result and sends back the new state.</p>
+<pre><code><span class="c">// e.g. at the end of memory.vue, when the player wins</span>
+import { api } from '@/lib/api'
+
+async function onGameWon() {
+    try {
+        const { data } = await api.post('/progress/xp', { game: 'memory' })
+        <span class="c">// data is { xp: 170, coins: 30 } — the new totals, decided by the server</span>
+        showReward(data)
+    } catch {
+        <span class="c">// show "couldn't save, try again"</span>
+    }
+}</code></pre>
+<p>The second argument to <code>api.post</code> becomes <code>req.body</code> on the server. Send the minimum the server needs to apply its rule.</p>
+
+<!-- =================================================================== -->
+<h2 id="feature">Add your own feature (e.g. collection)</h2>
+<p>Five steps. The worked example is <code>progress</code>; swap in your own names.</p>
+
+<h3>1. Create the table in Supabase</h3>
+<p>Table Editor → New table. Always include a <code>user_id</code> column:</p>
+<table>
+  <tr><th>Column</th><th>Type</th><th>Settings</th></tr>
+  <tr><td><code>id</code></td><td>int8</td><td>primary (default, leave it)</td></tr>
+  <tr><td><code>created_at</code></td><td>timestamptz</td><td>default <code>now()</code> (default, leave it)</td></tr>
+  <tr><td><code>user_id</code></td><td>uuid</td><td><b>no default</b> (clear the box), foreign key → <code>auth.users.id</code>, "Is Unique" if one row per user</td></tr>
+  <tr><td>your columns…</td><td></td><td>e.g. <code>item_id</code> text, <code>collected_at</code> timestamptz</td></tr>
+</table>
+<p>Leave "Enable Row Level Security" ticked.</p>
+
+<h3>2. Add one SELECT policy</h3>
+<p>Table → Policies → New policy → "For full customization". Command SELECT, USING expression:</p>
+<pre><code>auth.uid() = user_id</code></pre>
+<p>No INSERT/UPDATE/DELETE policies for users. The server does the writing.</p>
+
+<h3>3. Write <code>server/routes/&lt;feature&gt;.js</code></h3>
+<p>Copy <code>progress.js</code>. The skeleton:</p>
+<pre><code>import { Router } from 'express'
+import { requireAuth } from '../middleware/auth.js'
+import { supabase } from '../supabase.js'
+
+const router = Router()
+
+<span class="c">// GET /api/collection  → all items this user has collected</span>
+router.get('/', requireAuth, async (req, res) => {
+    const { data, error } = await supabase
+        .from('collection')
+        .select('item_id, collected_at')
+        .eq('user_id', req.user.id)          <span class="c">// ALWAYS</span>
+
+    if (error) return res.status(500).json({ message: 'Could not load collection.' })
+    res.json(data)
+})
+
+<span class="c">// POST /api/collection  body: { itemId }  → add one item</span>
+router.post('/', requireAuth, async (req, res) => {
+    const { itemId } = req.body
+    if (!itemId) return res.status(400).json({ message: 'Missing itemId.' })
+
+    const { data, error } = await supabase
+        .from('collection')
+        .insert({ user_id: req.user.id, item_id: itemId })   <span class="c">// user_id from the token, never from the body</span>
+        .select()
+        .single()
+
+    if (error) return res.status(500).json({ message: 'Could not save item.' })
+    res.status(201).json(data)
+})
+
+export default router</code></pre>
+
+<h3>4. Mount it in <code>server/server.js</code></h3>
+<pre><code>import collectionRoutes from './routes/collection.js'
+<span class="c">// ...next to the other app.use lines</span>
+app.use('/api/collection', collectionRoutes)</code></pre>
+<p>The prefix here plus the path inside the file is the full URL. <code>router.post('/')</code> in a file mounted at <code>/api/collection</code> is <code>POST /api/collection</code>.</p>
+
+<h3>5. Call it from your page</h3>
+<pre><code>const { data } = await api.get('/collection')
+await api.post('/collection', { itemId: 'merlion' })</code></pre>
+
+<div class="note"><b>Supabase query cheatsheet</b> (inside a route): <code>.select('a, b')</code> read columns · <code>.eq('col', v)</code> filter · <code>.maybeSingle()</code> one row or null · <code>.single()</code> exactly one row · <code>.insert({...})</code> · <code>.update({...}).eq(...)</code> · <code>.upsert({...}, { onConflict: 'user_id' })</code> insert-or-update · <code>.delete().eq(...)</code> · <code>.order('col', { ascending: false })</code>. Every call returns <code>{ data, error }</code>. Always check <code>error</code>.</div>
+
+<!-- =================================================================== -->
+<h2 id="test">Testing without a page</h2>
+<p>Both servers running, signed in on the site. Open the browser console on any page:</p>
+<pre><code>const { api } = await import('/src/lib/api.js')
+;(await api.get('/progress')).data
+;(await api.post('/progress/xp', { game: 'memory' })).data
+;(await api.post('/progress/xp', { game: 'cheat' })).data     <span class="c">// 400 — server refuses unknown games</span></code></pre>
+<p>Line 1 loads the helper into the console. The leading <code>;</code> on the others is a paste quirk, not something you write in files. A 4xx/5xx shows as a red error, which is axios throwing on purpose.</p>
+<p>Server up at all? <code>curl http://127.0.0.1:8000/api/health</code> → <code>{"ok":true}</code>.</p>
+
+<!-- =================================================================== -->
+<h2 id="errors">Common errors</h2>
+<table>
+  <tr><th>You see</th><th>It means</th><th>Fix</th></tr>
+  <tr><td>Network Error / connection refused</td><td>Server isn't running</td><td><code>cd server && pnpm dev</code></td></tr>
+  <tr><td>Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY</td><td><code>server/.env</code> empty or absent</td><td>Fill it from <code>.env.example</code>, restart</td></tr>
+  <tr><td>401 Not signed in.</td><td>No token was sent</td><td>Sign in on the site first. Are you using <code>api</code> from <code>@/lib/api</code>, not plain axios?</td></tr>
+  <tr><td>401 Session expired.</td><td>Token invalid or expired</td><td>Sign out, sign in again</td></tr>
+  <tr><td>CORS error in the console</td><td>Browser origin doesn't match <code>CLIENT_ORIGIN</code></td><td>Check the port. Vite sometimes uses 5174 if 5173 is busy; set <code>CLIENT_ORIGIN</code> to match</td></tr>
+  <tr><td>404 No such API route.</td><td>Route file not mounted, or path typo</td><td>Check <code>app.use('/api/...')</code> in server.js and the path in your <code>api.get</code></td></tr>
+  <tr><td>500 Could not load…</td><td>Supabase query failed</td><td>Look at the server terminal. Usually a wrong table/column name or RLS blocking a write</td></tr>
+  <tr><td>Empty array / null when you expect rows</td><td>Row's <code>user_id</code> doesn't match the signed-in user</td><td>Compare the UUID in the table with Authentication → Users</td></tr>
+</table>
+
+<p class="sub" style="margin-top:48px">Questions about the auth side (login, guard, sessions)? See <code>login-flow.html</code> in this folder.</p>
+
+</div>
+</body>
+</html>
