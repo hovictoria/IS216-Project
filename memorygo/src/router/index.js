@@ -6,8 +6,8 @@ import landing from "@/components/auth/landing.vue"
 import login from "@/components/auth/login.vue"
 import signup from "@/components/auth/signup.vue"
 
-/* Home Page menu dashboard */
-import menu from "../components/menu.vue"
+/* Home Page menu dashboard (teammate's views/main.vue, which includes the sidebar menu) */
+import main from "../views/main.vue"
 
 /* Games */
 import games from "../components/games/games.vue"
@@ -39,7 +39,7 @@ const router = createRouter({
     // The following route are for menu dashboard
     {
       path: "/menu",
-      component: menu,
+      component: main,
       meta: { requiresAuth: true }
     }
 
