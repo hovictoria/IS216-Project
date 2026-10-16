@@ -15,7 +15,7 @@ import cors from 'cors'
 // Routes for user info
 import meRoutes from './routes/me.js'
 
-
+import spiritsRoutes from './routes/spirits.js'
 
 
 const PORT = Number(process.env.PORT) || 8000
@@ -34,7 +34,7 @@ app.use(express.json())                    // parse JSON request bodies into req
 // One line per feature file in routes/
 app.use('/api/me', meRoutes)
 
-
+app.use('/api/spirits', spiritsRoutes)
 
 
 
