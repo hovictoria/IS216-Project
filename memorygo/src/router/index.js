@@ -1,22 +1,22 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
+import { useAuthStore } from '../stores/auth'
 
 /* Auth - Landing, Login, SignUp */
-import landing from "@/components/auth/landing.vue"
-import login from "@/components/auth/login.vue"
-import signup from "@/components/auth/signup.vue"
+import landing from "../components/auth/landing.vue"
+import login from "../components/auth/login.vue"
+import signup from "../components/auth/signup.vue"
 
 /* Home Page menu dashboard (teammate's views/main.vue, which includes the sidebar menu) */
 import main from "../views/main.vue"
 
 /* Games */
 import games from "../components/games/games.vue"
-import memory from "../components/games/memory.vue"
-import object from "../components/games/object.vue"
-import sequence from "../components/games/sequence.vue"
-import pattern from "../components/games/pattern.vue"
-import missing from "../components/games/missing.vue"
-import oddoneout from "../components/games/oddoneout.vue"
+import memory from "../views/games/memory.vue"
+import object from "../views/games/object.vue"
+import sequence from "../views/games/sequence.vue"
+import pattern from "../views/games/pattern.vue"
+import missing from "../views/games/missing.vue"
+import oddoneout from "../views/games/oddoneout.vue"
 
 
 const router = createRouter({
@@ -34,6 +34,10 @@ const router = createRouter({
     {
       path: "/signup",
       component: signup
+    },
+    {
+      path: "/games",
+      component: oddoneout
     },
 
     // The following route are for menu dashboard

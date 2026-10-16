@@ -1,10 +1,16 @@
 <script setup>
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch,onBeforeUnmount } from "vue";
 import AppMenu from "@/components/menu.vue";
 import heroImg from "@/assets/bg.png";
+import { useAuthStore } from "../stores/auth";
+import { useRouter } from "vue-router";
+
+const auth = useAuthStore()
+
+const router = useRouter();
 
 /* ---------- Data (replace with real data from your store / API) ---------- */
-const username = "Mei Ling";
+const username = auth.user.user_metadata.display_name;
 const now = new Date();
 
 const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -52,27 +58,55 @@ const streakMessage = computed(() =>
 /* ---------- Read aloud ---------- */
 const readAloud = ref(true);
 const mainEl = ref(null);
+const speaking = ref(false);
+
+function stopSpeaking() {
+  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  speaking.value = false;
+}
 
 function speakPage() {
   if (!("speechSynthesis" in window) || !mainEl.value) return;
-  window.speechSynthesis.cancel();
+
+  // Second click stops it
+  if (speaking.value) {
+    stopSpeaking();
+    return;
+  }
+
   const utterance = new SpeechSynthesisUtterance(mainEl.value.innerText);
   utterance.rate = 0.9;
+  utterance.onend = () => (speaking.value = false);
+  utterance.onerror = () => (speaking.value = false);
+
+  speaking.value = true;
   window.speechSynthesis.speak(utterance);
 }
 
+// Turning the sidebar switch off also stops it
 watch(readAloud, (on) => {
-  if (!on && "speechSynthesis" in window) window.speechSynthesis.cancel();
+  if (!on) stopSpeaking();
 });
 
+// Don't keep talking after leaving the page
+onBeforeUnmount(stopSpeaking);
+
 function startGame() {
-  // e.g. router.push("/games/memory-match")
+  router.push("/games")
 }
 </script>
 
 <template>
   <div class="app-shell">
-    <AppMenu v-model:readAloud="readAloud" />
+    <AppMenu v-model:readAloud="readAloud">
+      <template #mobile-actions>
+        <button type="button" class="read-pill in-header" @click="speakPage">
+          <i class="fa-solid" :class="speaking ? 'fa-stop' : 'fa-volume-high'" aria-hidden="true"></i>
+          <span>{{ speaking ? "Stop" : "Read aloud" }}</span>
+        </button>
+      </template>
+    </AppMenu>
+
 
     <!-- Main -->
     <main class="main" ref="mainEl">
@@ -80,12 +114,11 @@ function startGame() {
       <div class="hero">
         <img :src="heroImg" alt="" class="hero-img" />
 
-        <button type="button" class="read-pill" @click="speakPage">
-          <i class="fa-solid fa-volume-high" aria-hidden="true"></i>
-          <span>Read aloud</span>
+        <button type="button" class="read-pill d-none d-md-inline-flex" @click="speakPage">
+          <i class="fa-solid" :class="speaking ? 'fa-stop' : 'fa-volume-high'" aria-hidden="true"></i>
+          <span>{{ speaking ? "Stop" : "Read aloud" }}</span>
         </button>
       </div>
-
       <div class="content">
         <div class="row g-4">
           <!-- Left column -->
@@ -119,12 +152,12 @@ function startGame() {
               </ol>
             </section>
 
-            <button type="button" class="btn-cta mt-2 mx-md-5" @click="startGame">
+            <button type="button" class="btn-cta mt-2" @click="startGame">
               <span>Start today's game</span>
               <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
             </button>
 
-            <p class="streak-note mx-md-5">
+            <p class="streak-note mx-5 mx-sm-0">
               <i class="fa-solid fa-seedling" aria-hidden="true"></i>
               <span>
                 {{ streak === 0 ? "Play today to start your streak." : `You've played ${dayLabel(streak)} in a row.` }}
@@ -308,13 +341,10 @@ h2,
   object-position: center bottom;
 }
 .read-pill {
-  position: absolute;
-  top: 1rem;
-  right: 1.25rem;
   display: inline-flex;
   align-items: center;
   gap: 0.6rem;
-  padding: 0.7rem 1.35rem;
+  padding: 0.5rem 1.1rem;
   border: 1px solid var(--dash);
   border-radius: 999px;
   background: var(--card);
@@ -326,6 +356,13 @@ h2,
   color: var(--blue);
 }
 
+/* Desktop: floats over the hero image */
+.hero .read-pill {
+  position: absolute;
+  top: 1rem;
+  right: 1.25rem;
+  padding: 0.7rem 1.35rem;
+}
 .content {
   padding: 1.5rem 1.5rem 2.5rem;
   max-width: 1100px;
@@ -452,7 +489,7 @@ h1 {
     padding-bottom: 90px;
   }
   .hero {
-    height: 130px;
+    height: 90px;
   }
   .content {
     padding: 1.25rem 1rem 1.5rem;

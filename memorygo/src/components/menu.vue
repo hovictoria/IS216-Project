@@ -1,6 +1,6 @@
 <script setup>
 import { useRouter } from "vue-router";
-import { useAuthStore } from "@/stores/auth";
+import { useAuthStore } from "../stores/auth";
 
 defineProps({
   readAloud: { type: Boolean, default: false },
@@ -26,21 +26,18 @@ const navItems = [
 
 <template>
   <!-- Mobile top bar -->
-  <header class="d-md-none d-flex align-items-center gap-2 px-3 py-2 mobile-header">
-    <svg class="brand-pin" viewBox="0 0 32 40" aria-hidden="true">
-      <path d="M16 38C16 38 3 24 3 15a13 13 0 0 1 26 0c0 9-13 23-13 23Z" fill="var(--terracotta)" />
-      <rect x="10" y="9" width="12" height="12" rx="2" fill="var(--card)" />
-    </svg>
-    <router-link to="/menu" class="brand">Memory Go</router-link>
+  <header class="d-md-none d-flex align-items-center justify-content-between gap-2 px-3 py-2 mobile-header">
+    <div class="d-flex align-items-center gap-2">
+      <img src="../assets/app-logo.png" alt="" style="width:30px;">
+      <router-link to="/menu" class="brand">Memory Go</router-link>
+    </div>
+    <slot name="mobile-actions" />
   </header>
 
   <!-- Desktop sidebar -->
   <aside class="sidebar d-none d-md-flex flex-column">
     <router-link to="/menu" class="d-flex align-items-center gap-2 mb-4 text-decoration-none">
-      <svg class="brand-pin" viewBox="0 0 32 40" aria-hidden="true">
-        <path d="M16 38C16 38 3 24 3 15a13 13 0 0 1 26 0c0 9-13 23-13 23Z" fill="var(--terracotta)" />
-        <rect x="10" y="9" width="12" height="12" rx="2" fill="var(--card)" />
-      </svg>
+      <img src="../assets/app-logo.png" alt="" style="width:30px;">
       <span class="brand">Memory Go</span>
     </router-link>
 
@@ -227,7 +224,6 @@ const navItems = [
 /* ---------- Mobile header ---------- */
 .mobile-header {
   background: var(--sidebar);
-  border-bottom: 1px solid var(--dash);
 }
 
 /* ---------- Mobile bottom nav ---------- */
