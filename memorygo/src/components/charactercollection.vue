@@ -1,21 +1,43 @@
 <script setup>
-import { ref, computed } from 'vue'                         
+import { ref, computed, onMounted} from 'vue'                         
 import AppMenu from '@/components/menu.vue'        // the sidebar
-import { spirits, foundIds } from '../data/spirits.js'
+// import { spirits, foundIds } from '../data/spirits.js' //testing data 
+
+import { api } from '@/lib/api'  //helper for calling the server
 
 const readAloud = ref(false)                       // the sidebar's on/off switch needs this
 
+const spirits = ref([])       // all 50 spirits
+const found = ref([])         // this user's rows from user_spirits
+const loading = ref(true)
+const errorMsg = ref('')
+
 const filter = ref('all')
 
-const isFound = (id) => foundIds.includes(id)
+// const isFound = (id) => foundIds.includes(id)
+const isFound = (id) => found.value.some((f) => f.spirit_id === id)
+
 
 const visibleSpirits = computed(()=>{
     if (filter.value === 'found'){
-        return spirits.filter((s) =>
+        return spirits.value.filter((s) =>
             isFound(s.id)
         )
     }
-    return spirits
+    return spirits.value
+})
+
+//fetch data once the page opens
+onMounted(async () => {
+    try {
+        const { data } = await api.get('/spirits')
+        spirits.value = data.spirits
+        found.value = data.found
+    } catch (e) {
+        errorMsg.value = "We couldn't load your spirits. Please try again."
+    } finally {
+        loading.value = false
+    }
 })
 
 
@@ -29,7 +51,7 @@ const visibleSpirits = computed(()=>{
         <main class="main">                            
         <div class="container py-4">
             <h1>My Collection</h1>
-            <p>{{ foundIds.length }} / {{ spirits.length }} found</p>
+            <p>{{ found.length }} / {{ spirits.length }} found</p>
 
         <!-- filtering the spirits -->
         <div class="d-flex gap-3 mb-4">
@@ -51,6 +73,10 @@ const visibleSpirits = computed(()=>{
             Found by me
             </button>
         </div>
+
+        <!-- loading/error msg -->
+        <p v-if="loading">Loading your spirits…</p>
+        <p v-else-if="errorMsg" class="text-danger">{{ errorMsg }}</p>
 
             <div class="row g-3">
             <div v-for="s in visibleSpirits" :key="s.id" class="col-6 col-md-3">
