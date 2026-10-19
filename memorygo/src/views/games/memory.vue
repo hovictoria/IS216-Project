@@ -3,6 +3,9 @@ import { ref, computed } from 'vue'
 import GameLayout from '../../components/games/GameLayout.vue'
 import GameProgress from '../../components/games/GameProgress.vue'
 
+import { useGameReward } from '@/lib/gamereward'
+
+const { reward, claim, reset } = useGameReward('memory')
 function shuffle(array) {
     const arr = [...array]
     for (let i = arr.length - 1; i > 0; i--) {
@@ -66,6 +69,7 @@ function checkMatch() {
         first.matched = true
         second.matched = true
         selectedCards.value = []
+        if (pairsFound.value === totalPairs) claim()
     } else {
         setTimeout(() => {
             first.flipped = false
@@ -85,6 +89,7 @@ function restartGame() {
     selectedCards.value = []
     moves.value = 0
     peeking.value = false
+    reset()
 }
 
 // Briefly reveal every card
@@ -100,6 +105,7 @@ function isFaceUp(card) {
 </script>
 
 <template>
+    
   <GameLayout
     title="Memory Match"
     intro="Tap two cards to find a pair. There's no rush."
@@ -112,7 +118,10 @@ function isFaceUp(card) {
       :total="totalPairs"
       :results="pairResults"
     />
-
+    <div v-if="reward" class="text-center fw-bold mt-4" aria-live="polite">
+        <p><i class="fa-solid fa-star text-gold me-2"></i>
+        You now have {{ reward.xp }} XP and {{ reward.coins }} coins. </p> 
+    </div>
     <button class="btn btn-memory w-100 fw-bold py-2 mb-3" :disabled="peeking" @click="showCards">
       <i class="fa-solid fa-eye me-2"></i>Show me the cards
     </button>
@@ -152,12 +161,10 @@ function isFaceUp(card) {
       </button>
     </div>
   </GameLayout>
+    
 </template>
 
 <style scoped>
-/* Only the card styles live here now. Everything else is in the shared components. */
-
-/* Named memory-card so it doesn't clash with Bootstrap's .card */
 .memory-card {
     aspect-ratio: 1;
     border: 2px solid var(--blue);

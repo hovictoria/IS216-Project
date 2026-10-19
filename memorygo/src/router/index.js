@@ -39,10 +39,9 @@ const router = createRouter({
     },
     {
       path: "/games",
-      component: oddoneout
+      component: memory
     },
 
-    // The following route are for menu dashboard
     {
       path: "/menu",
       component: main,
@@ -52,34 +51,6 @@ const router = createRouter({
       path: "/spirits",
       component: collection,
       meta: { requiresAuth: true }
-    },
-    {
-      path: "/games",
-      component: games
-    },
-    {
-      path: "/object",
-      component: object
-    },
-    {
-      path: "/memory",
-      component: memory
-    },
-    {
-      path: "/sequence",
-      component: sequence
-    },
-    {
-      path: "/pattern",
-      component: pattern
-    },
-    {
-      path: "/missing",
-      component: missing
-    },
-    {
-      path: "/oddoneout",
-      component: oddoneout
     }
 
   ],

@@ -53,26 +53,12 @@ const navItems = [
     </nav>
 
     <div class="card-soft sidebar-card mt-auto">
-      <div class="d-flex align-items-center justify-content-between gap-2">
-        <span id="readAloudLabel" class="fw-bold lh-sm">Read pages aloud</span>
-        <button
-          type="button"
-          role="switch"
-          class="switch"
-          :class="{ on: readAloud }"
-          :aria-checked="readAloud"
-          aria-labelledby="readAloudLabel"
-          @click="emit('update:readAloud', !readAloud)"
-        >
-          <span class="switch-text">{{ readAloud ? "On" : "Off" }}</span>
-          <span class="switch-knob"></span>
-        </button>
-      </div>
-      <router-link to="/help" class="help-link mt-2">
+      <router-link to="/help" class="btn-soft sm">
         <i class="fa-regular fa-circle-question" aria-hidden="true"></i>
-        <span>Help and how to play</span>
+        <span>Help</span>
       </router-link>
-      <button type="button" class="help-link mt-2 border-0 bg-transparent p-0" @click="onSignOut">
+
+      <button type="button" class="btn-soft sm mt-2" @click="onSignOut">
         <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
         <span>Sign out</span>
       </button>
@@ -111,12 +97,11 @@ const navItems = [
   position: fixed;
   inset: 0 auto 0 0;
   width: 250px;
-  padding: 1.5rem 1rem 1.25rem 1.25rem;
+  padding: 1.5rem 1.25rem 1.25rem 1.25rem;
   background: var(--sidebar);
   border-right: 1px solid var(--dash);
   z-index: 10;
 }
-
 .nav-ribbon {
   position: relative;
   display: flex;
@@ -156,7 +141,7 @@ const navItems = [
 }
 
 .sidebar-card {
-  padding: 1rem 1rem 1rem 1.1rem;
+  padding: 1rem;
   border-radius: 20px;
 }
 .sidebar-card::before {
@@ -201,6 +186,39 @@ const navItems = [
 .switch:not(.on) .switch-text {
   padding-left: 30px;
 }
+/* Secondary button: for links and actions that aren't the main one */
+.btn-soft {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: 52px;
+  padding: 0.7rem 1.5rem;
+  background: var(--card);
+  color: var(--blue);
+  border: 2px solid var(--blue);
+  border-radius: 14px;
+  font-weight: 800;
+  font-size: 1.1rem;
+  line-height: 1.2;
+  text-decoration: none;
+}
+.btn-soft:hover {
+  background: #fff;
+  color: var(--blue);
+}
+.btn-soft:active {
+  transform: translateY(2px);
+}
+
+/* Slightly smaller for the sidebar */
+.btn-soft.sm {
+  min-height: 46px;
+  padding-top: 0.55rem;
+  padding-left:0px;
+  font-size: 1rem;
+}
 @media (prefers-reduced-motion: reduce) {
   .switch-knob {
     transition: none;
@@ -214,8 +232,7 @@ const navItems = [
   color: var(--blue);
   font-weight: 800;
   line-height: 1.25;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  text-decoration: none;
 }
 .help-link i {
   margin-top: 0.2rem;

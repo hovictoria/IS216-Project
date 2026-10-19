@@ -1,6 +1,8 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
+import { ref } from 'vue'
+import { api } from '@/lib/api'
 
 import App from './App.vue'
 import router from './router'
@@ -21,3 +23,32 @@ auth.init().then(() => {
     app.use(router)                 //installs the router
     app.mount('#app')               // renders the first page
 })
+
+export function useGameReward(game) {
+    const reward = ref(null)      // { xp, coins } from the server
+    const awarding = ref(false)
+    let awarded = false           // stops double awards
+
+    async function claim() {
+        if (awarded) return
+        awarded = true
+        awarding.value = true
+
+        try {
+            const { data } = await api.post('/progress/xp', { game })
+            reward.value = data
+        } catch (error) {
+            awarded = false       // let them retry if the request failed
+            console.error(error)
+        } finally {
+            awarding.value = false
+        }
+    }
+
+    function reset() {
+        awarded = false
+        reward.value = null
+    }
+
+    return { reward, awarding, claim, reset }
+}

@@ -1,9 +1,12 @@
 <script setup>
-import { ref, computed, watch,onBeforeUnmount } from "vue";
+import { ref, computed, watch,onBeforeUnmount, onMounted } from "vue";
 import AppMenu from "@/components/menu.vue";
-import heroImg from "@/assets/bg.png";
 import { useAuthStore } from "../stores/auth";
 import { useRouter } from "vue-router";
+import { api } from '@/lib/api';
+import heroMorning from "@/assets/morning.jpg";
+import heroAfternoon from "@/assets/afternoon.jpg";
+import heroEvening from "@/assets/night.png";
 
 const auth = useAuthStore()
 
@@ -15,7 +18,7 @@ const now = new Date();
 
 const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 // Which days this week the person has played (Mon..Sun). Replace with real data.
-const played = ref([true, true, true, false, false, false, false]);
+/* const played = ref([true, true, true, false, false, false, false]); */
 
 const game = { name: "Memory Match", minutes: 3 };
 
@@ -30,7 +33,7 @@ const walk = {
 /* ---------- Derived values ---------- */
 const hour = now.getHours();
 const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-
+const heroImg = hour < 12 ? heroMorning : hour < 18 ? heroAfternoon : heroEvening;
 const dateLabel = computed(() => {
   const weekday = now.toLocaleDateString("en-GB", { weekday: "long" });
   const rest = now.toLocaleDateString("en-GB", { day: "numeric", month: "long" });
@@ -40,13 +43,6 @@ const dateLabel = computed(() => {
 // Monday = 0 … Sunday = 6
 const todayIdx = (now.getDay() + 6) % 7;
 
-// Consecutive played days immediately before today
-const streak = computed(() => {
-  let count = 0;
-  for (let i = todayIdx - 1; i >= 0 && played.value[i]; i--) count++;
-  return count;
-});
-
 const dayLabel = (n) => `${n} ${n === 1 ? "day" : "days"}`;
 
 const streakMessage = computed(() =>
@@ -54,6 +50,21 @@ const streakMessage = computed(() =>
     ? "Play today to start your streak."
     : `You've played ${dayLabel(streak.value)} in a row. Play today to make it ${streak.value + 1}.`
 );
+const streak=ref(0);
+const played = ref([]);
+
+onMounted(
+  async () => {
+    try{
+      const {data}=await api.get('/progress/streak')
+      streak.value=data.streak;
+      played.value=data.week;
+      console.log(data);
+    }catch(error){
+      console.log(error)
+    }
+  }
+)
 
 /* ---------- Read aloud ---------- */
 const readAloud = ref(true);
@@ -196,7 +207,7 @@ function startGame() {
                 </li>
               </ol>
               <p class="mt-3 mb-3 text-muted-ink">{{ walk.total }}</p>
-              <router-link to="/map" class="text-link">
+              <router-link to="/map" class="btn-soft">
                 <span>Open the map</span>
                 <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
               </router-link>
@@ -285,6 +296,38 @@ h2,
   font-weight: 800;
   box-shadow: 0 5px 0 var(--terracotta-deep);
   transition: transform 0.08s, box-shadow 0.08s;
+}
+/* Secondary button: for links and actions that aren't the main one */
+.btn-soft {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: 52px;
+  padding: 0.7rem 1.25rem;
+  background: var(--card);
+  color: var(--blue);
+  border: 2px solid var(--blue);
+  border-radius: 14px;
+  font-weight: 800;
+  font-size: 1.1rem;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+}
+.btn-soft:hover {
+  background: #fff;
+  color: var(--blue);
+}
+.btn-soft:active {
+  transform: translateY(2px);
+}
+
+.btn-soft.sm {
+  min-height: 46px;
+  padding: 0.55rem 1rem;
+  font-size: 1rem;
 }
 .btn-cta:hover {
   background: #b55737;
