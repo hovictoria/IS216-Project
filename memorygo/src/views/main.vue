@@ -56,10 +56,10 @@ const played = ref([]);
 onMounted(
   async () => {
     try{
+      await api.post("/progress/init"); 
       const {data}=await api.get('/progress/streak')
       streak.value=data.streak;
       played.value=data.week;
-      console.log(data);
     }catch(error){
       console.log(error)
     }

@@ -7,7 +7,9 @@ const router = Router()
 const TABLE = 'progress'
 const TIME_ZONE = 'Asia/Singapore'
 const emptyWeek = () => [false, false, false, false, false, false, false]
-
+const GAMES = ['memory', 'whats-missing', 'object-id', 'odd-one-out', 'pattern', 'sequence']
+const XP_PER_WIN = 20
+const COINS_PER_WIN = 10
 // ---------- Date helpers (all dates are 'YYYY-MM-DD' strings) ----------
 
 // Today's date in Singapore
@@ -105,7 +107,13 @@ export async function recordPlay(userId) {
 
     return buildStatus(update)
 }
-
+export async function ensureProgress(userId) {
+    const { error } = await supabase
+        .from(TABLE)
+        .upsert({ user_id: userId }, { onConflict: 'user_id', ignoreDuplicates: true })
+ 
+    if (error) throw error
+}
 // ---------- Routes ----------
 
 // GET /api/progress/streak → current streak, this week's ticks, and whether they played today
@@ -123,10 +131,16 @@ router.get('/streak', requireAuth, async (req, res) => {
 
     res.json(buildStatus(progress))
 })
+router.post('/init', requireAuth, async (req, res) => {
+    try {
+        await ensureProgress(req.user.id)
+        res.json({ ok: true })
+    } catch (error) {
+        console.error(error)
+        res.status(500).json({ message: 'Could not set up your progress.' })
+    }
+})
 
-const GAMES = ['memory', 'whats-missing', 'object-id', 'odd-one-out', 'pattern', 'sequence']
-const XP_PER_WIN = 20
-const COINS_PER_WIN = 10
 
 // POST /api/progress/xp → body: { game }
 router.post('/xp', requireAuth, async (req, res) => {
