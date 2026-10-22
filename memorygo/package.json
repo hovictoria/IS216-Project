@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:phone": "vite --mode phone --host",
     "build": "vite build",
     "preview": "vite preview",
     "test:unit": "vitest",
@@ -20,6 +21,7 @@
     "@tresjs/core": "^5.9.3",
     "axios": "^1.20.0",
     "bootstrap": "^5.3.8",
+    "maplibre-gl": "4.7.1",
     "pinia": "^4.0.3",
     "three": "^0.186.1",
     "vue": "^3.5.42",
@@ -28,6 +30,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.63.0",
+    "@vitejs/plugin-basic-ssl": "2.3.0",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vitest/eslint-plugin": "^1.6.27",
     "@vue/test-utils": "^2.5.0",
