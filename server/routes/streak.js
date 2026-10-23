@@ -7,9 +7,29 @@ const router = Router()
 const TABLE = 'progress'
 const TIME_ZONE = 'Asia/Singapore'
 const emptyWeek = () => [false, false, false, false, false, false, false]
-const GAMES = ['memory', 'whats-missing', 'object-id', 'odd-one-out', 'pattern', 'sequence']
-const XP_PER_WIN = 20
-const COINS_PER_WIN = 10
+const clamp = (n, min, max) => Math.min(Math.max(n, min), max)
+
+// Reward range. Finishing always earns the minimum, a perfect result earns the maximum.
+const XP = { min: 10, max: 30 }
+const COINS = { min: 5, max: 15 }
+const rewardFor = (range, fraction) =>
+    Math.round(range.min + fraction * (range.max - range.min))
+
+// How well they did, from 0 to 1, for each game
+const GAMES = {
+    // 6 pairs: 6 moves is perfect, more moves earns less
+    'memory': ({ moves }) => 6 / clamp(Number(moves) || 30, 6, 30),
+
+    // 5 rounds: the fraction answered correctly
+    'whats-missing': ({ score }) => clamp(Number(score) || 0, 0, 5) / 5,
+    'object-id': ({ score }) => clamp(Number(score) || 0, 0, 5) / 5,
+    'odd-one-out': ({ score }) => clamp(Number(score) || 0, 0, 5) / 5,
+    'pattern': ({ score }) => clamp(Number(score) || 0, 0, 5) / 5,
+
+    // Level reached, with level 10 counting as perfect
+    'sequence': ({ level }) => clamp(Number(level) || 0, 0, 10) / 10
+}
+
 // ---------- Date helpers (all dates are 'YYYY-MM-DD' strings) ----------
 
 // Today's date in Singapore
@@ -142,43 +162,49 @@ router.post('/init', requireAuth, async (req, res) => {
 })
 
 
-// POST /api/progress/xp → body: { game }
+// POST /api/progress/xp → body: { game, score? | moves? | level? }
 router.post('/xp', requireAuth, async (req, res) => {
-    const { game } = req.body
+    const getFraction = GAMES[req.body?.game]
 
-    if (!GAMES.includes(game)) {
+    if (!getFraction) {
         return res.status(400).json({ message: 'Unknown game.' })
     }
 
+    const fraction = getFraction(req.body)
+    const xpEarned = rewardFor(XP, fraction)
+    const coinsEarned = rewardFor(COINS, fraction)
+
     try {
-        // 1. Update the streak first. This also creates the user's row if they don't have one.
+        // Update the streak first. This also creates the user's row if they have none.
         const status = await recordPlay(req.user.id)
 
-        // 2. Add the rewards
         const { data: row, error } = await supabase
-            .from(TABLE)
+            .from('progress')
             .select('xp, coins')
             .eq('user_id', req.user.id)
             .single()
 
         if (error) throw error
 
-        const xp = (row.xp || 0) + XP_PER_WIN
-        const coins = (row.coins || 0) + COINS_PER_WIN
+        const xp = (row.xp || 0) + xpEarned
+        const coins = (row.coins || 0) + coinsEarned
 
         const { error: updateError } = await supabase
-            .from(TABLE)
+            .from('progress')
             .update({ xp, coins })
             .eq('user_id', req.user.id)
 
         if (updateError) throw updateError
 
-        // 3. Send the new totals back. The server decides them, not the browser.
-        res.json({ xp, coins, streak: status.streak })
+        res.json({
+            xp,
+            coins,
+            streak: status.streak,
+            earned: { xp: xpEarned, coins: coinsEarned }
+        })
     } catch (error) {
         console.error(error)
         res.status(500).json({ message: 'Could not save your progress.' })
     }
 })
-
 export default router

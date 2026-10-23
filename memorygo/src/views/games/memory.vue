@@ -69,7 +69,7 @@ function checkMatch() {
         first.matched = true
         second.matched = true
         selectedCards.value = []
-        if (pairsFound.value === totalPairs) claim()
+        if (pairsFound.value === totalPairs) claim({ moves: moves.value })
     } else {
         setTimeout(() => {
             first.flipped = false
@@ -119,9 +119,9 @@ function isFaceUp(card) {
       :results="pairResults"
     />
     <div v-if="reward" class="text-center fw-bold mt-4" aria-live="polite">
-        <p><i class="fa-solid fa-star text-gold me-2"></i>
-        You now have {{ reward.xp }} XP and {{ reward.coins }} coins. </p> 
-    </div>
+      <i class="fa-solid fa-star text-gold me-2"></i>
+      You earned {{ reward.earned.xp }} XP and {{ reward.earned.coins }} coins.
+    </div><br>
     <button class="btn btn-memory w-100 fw-bold py-2 mb-3" :disabled="peeking" @click="showCards">
       <i class="fa-solid fa-eye me-2"></i>Show me the cards
     </button>

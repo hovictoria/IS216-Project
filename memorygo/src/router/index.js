@@ -42,7 +42,7 @@ const router = createRouter({
     },
     {
       path: "/games",
-      component: memory
+      component: sequence
     },
 
     {

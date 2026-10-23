@@ -6,16 +6,16 @@ export function useGameReward(game) {
     const awarding = ref(false)
     let awarded = false           // stops double awards
 
-    async function claim() {
+    async function claim(result = {}) {
         if (awarded) return
         awarded = true
         awarding.value = true
 
         try {
-            const { data } = await api.post('/progress/xp', { game })
+            const { data } = await api.post('/progress/xp', { game, ...result })
             reward.value = data
         } catch (error) {
-            awarded = false       // let them retry if the request failed
+            awarded = false
             console.error(error)
         } finally {
             awarding.value = false
