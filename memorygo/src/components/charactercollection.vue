@@ -17,6 +17,18 @@ const filter = ref('all')
 // const isFound = (id) => foundIds.includes(id)
 const isFound = (id) => found.value.some((f) => f.spirit_id === id)
 
+// return the whole row, so can get the collected_at for the date
+const getFoundRow = (id) => found.value.find((f) => f.spirit_id === id)
+
+// turn the ISO date format to JavaScript object (human-readable)
+// ex: 16 Oct 2026
+const formatDate = (iso) => {
+    return new Date(iso).toLocaleDateString('en-SG', {
+        day: 'numeric', 
+        month: 'short',  //ex: oct instead of october
+        year: 'numeric'
+    })
+}
 
 const visibleSpirits = computed(()=>{
     if (filter.value === 'found'){
@@ -40,9 +52,7 @@ onMounted(async () => {
     }
 })
 
-
 </script>
-
 
 <template>
     <div class="app-shell">                          
@@ -80,9 +90,18 @@ onMounted(async () => {
 
             <div class="row g-3">
             <div v-for="s in visibleSpirits" :key="s.id" class="col-6 col-md-3">
-                <div class="card text-center p-3" :class="{ locked: !isFound(s.id) }">
-                <div class="display-4">{{ isFound(s.id) ? s.emoji : '❓' }}</div>
-                <h5>{{ isFound(s.id) ? s.name : '???' }}</h5>
+                <div class="h-100 card text-center p-3" :class="{ locked: !isFound(s.id) }">
+                    
+                    <!-- show spirit emoji -->
+                    <div class="display-4">{{ isFound(s.id) ? s.emoji : '❓' }}</div>
+                    
+                    <!-- show spirit name -->
+                    <h5>{{ isFound(s.id) ? s.name : '???' }}</h5>
+
+                    <!-- show date if the spirit is found -->
+                    <p v-if="isFound(s.id)" class="found-date mb-0">
+                        Found on: {{ formatDate(getFoundRow(s.id).collected_at) }}
+                    </p>
                 </div>
             </div>
             </div>
@@ -93,6 +112,11 @@ onMounted(async () => {
 
 <style scoped>
     .locked { opacity: 0.4; }
+
+    .found-date {
+    font-size: 1rem;
+    color: var(--ink-soft);
+}
 
     /* NEW: same layout rules as main.vue */
     .app-shell {
