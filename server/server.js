@@ -19,7 +19,7 @@ import spiritsRoutes from './routes/spirits.js'
 import streakRoutes from './routes/streak.js'
 
 const PORT = Number(process.env.PORT) || 8000
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173'
+const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173' || 'https://is-216-project-pv6r01k3z-memory-go.vercel.app/'
 
 // Create an express app
 const app = express()
