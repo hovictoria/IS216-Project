@@ -2,37 +2,37 @@
 
 // Define all levels and their unlock requirements.
 export const LEVELS = [
-  {
-    level: 1,
-    xp: 0,
-    games: ['memory', 'object'],
-    areas: ['area-1']
-  },
-  {
-    level: 2,
-    xp: 100,
-    games: ['oddoneout'],
-    areas: ['area-2']
-  },
-  {
-    level: 3,
-    xp: 250,
-    games: ['pattern'],
-    areas: []
-  },
-  {
-    level: 4,
-    xp: 450,
-    games: ['missing'],
-    areas: []
-  },
-  {
-    level: 5,
-    xp: 700,
-    games: ['sequence'],
-    areas: ['area-3']
-  }
+  { level: 1, xp: 0,   games: ['memory', 'object-id'], areas: [1] },
+  { level: 2, xp: 100, games: ['odd-one-out'],         areas: [2] },
+  { level: 3, xp: 250, games: ['pattern'],             areas: [] },
+  { level: 4, xp: 450, games: ['whats-missing'],       areas: [] },
+  { level: 5, xp: 700, games: ['sequence'],            areas: [] }
 ];
+
+// Which page each game lives on
+export const GAME_ROUTES = {
+  'memory': '/games/memory',
+  'object-id': '/games/object',
+  'odd-one-out': '/games/oddoneout',
+  'pattern': '/games/pattern',
+  'whats-missing': '/games/missing',
+  'sequence': '/games/sequence'
+};
+
+// Names for unlock messages
+export const GAME_NAMES = {
+  'memory': 'Memory Match', 'object-id': 'Object Identification',
+  'odd-one-out': 'Odd One Out', 'pattern': 'Pattern', 
+  'whats-missing': "What's Missing", 'sequence': 'Sequence Recall'
+};
+
+// Pick a random game from the ones this player has unlocked
+export function pickRandomGame(xp) {
+  //in result, it get the games and area that the user is at
+  const { games } = unlockedUpTo(levelFromXp(xp));
+  //randomly pick a game for the user to play at the station
+  return games[Math.floor(Math.random() * games.length)];
+}
 
 // Store the maximum level.
 export const MAX_LEVEL = LEVELS.length;
