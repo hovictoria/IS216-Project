@@ -2,6 +2,8 @@
 import { ref, computed } from 'vue'
 import GameLayout from '../../components/games/GameLayout.vue'
 import GameProgress from '../../components/games/GameProgress.vue'
+import { useGameReward } from '@/lib/gamereward'
+const { reward, claim, reset } = useGameReward('whats-missing')
 
 const pool = ['🍎', '🐶', '🌸', '🌳', '🐘', '🚗', '🏠', '🍌', '🐱', '⭐', '🎈', '☂️', '🐟', '⚽']
 const roundSizes = [4, 4, 5, 5, 6]
@@ -54,7 +56,8 @@ function choose(option) {
 
 function nextRound() {
     if (roundNumber.value === TOTAL_ROUNDS) {
-        finished.value = true
+        finished.value = true;
+        claim({ score: score.value });
         return
     }
     roundNumber.value++
@@ -70,6 +73,7 @@ function restartGame() {
     results.value = []
     finished.value = false
     phase.value = 'study'
+    reset();
 }
 
 function optionClass(option) {
@@ -103,7 +107,10 @@ const speech = computed(() => `What's missing? ${instruction.value}`)
       :total="TOTAL_ROUNDS"
       :results="results"
     />
-
+    <div v-if="reward" class="text-center fw-bold mt-4" aria-live="polite">
+        <i class="fa-solid fa-star text-gold me-2"></i>
+        You earned {{ reward.earned.xp }} XP and {{ reward.earned.coins }} coins.
+    </div><br>
     <template v-if="!finished">
 
       <!-- Items -->

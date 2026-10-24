@@ -4,7 +4,12 @@ import GameLayout from '../../components/games/GameLayout.vue'
 import GameProgress from '../../components/games/GameProgress.vue'
 
 import { useGameReward } from '@/lib/gamereward'
-
+import flour from '@/assets/flour.webp'
+/* import kopiImg from '@/assets/cards/kopi.png'
+import orchidImg from '@/assets/cards/orchid.png'
+import mrtImg from '@/assets/cards/mrt.png'
+import strawberryImg from '@/assets/cards/strawberry.png'
+import merlionImg from '@/assets/cards/merlion.png' */
 const { reward, claim, reset } = useGameReward('memory')
 function shuffle(array) {
     const arr = [...array]
@@ -17,18 +22,18 @@ function shuffle(array) {
 
 // 6 pairs = 12 cards
 const items = [
-    { value: '🚌', label: 'Bus' },
-    { value: '☕', label: 'Kopi' },
-    { value: '🌸', label: 'Orchid' },
-    { value: '🚆', label: 'MRT' },
-    { value: '🍓', label: 'Strawberry' },
-    { value: '🦁', label: 'Merlion' }
+    { value: 'flour', label: 'flour',image:flour },
+    { value: '☕', label: 'Kopi',image:flour },
+    { value: '🌸', label: 'Orchid',image:flour },
+    { value: '🚆', label: 'MRT',image:flour },
+    { value: '🍓', label: 'Strawberry',image:flour},
+    { value: '🦁', label: 'Merlion',image:flour }
 ]
 
 const cards = ref(shuffle(
     items.flatMap((item, i) => [
-        { id: i * 2 + 1, ...item, flipped: false, matched: false },
-        { id: i * 2 + 2, ...item, flipped: false, matched: false }
+        { id: i * 2 + 1, ...item, flipped: false, matched: false, wrong: false },
+        { id: i * 2 + 2, ...item, flipped: false, matched: false, wrong: false }
     ])
 ))
 
@@ -69,13 +74,18 @@ function checkMatch() {
         first.matched = true
         second.matched = true
         selectedCards.value = []
-        if (pairsFound.value === totalPairs) claim()
+        if (pairsFound.value === totalPairs) claim({ moves: moves.value })
     } else {
+        first.wrong = true
+        second.wrong = true
+
         setTimeout(() => {
             first.flipped = false
             second.flipped = false
+            first.wrong = false
+            second.wrong = false
             selectedCards.value = []
-        }, 800)
+        }, 1000)
     }
 }
 
@@ -119,40 +129,46 @@ function isFaceUp(card) {
       :results="pairResults"
     />
     <div v-if="reward" class="text-center fw-bold mt-4" aria-live="polite">
-        <p><i class="fa-solid fa-star text-gold me-2"></i>
-        You now have {{ reward.xp }} XP and {{ reward.coins }} coins. </p> 
-    </div>
+      <i class="fa-solid fa-star text-gold me-2"></i>
+      You earned {{ reward.earned.xp }} XP and {{ reward.earned.coins }} coins.
+    </div><br>
     <button class="btn btn-memory w-100 fw-bold py-2 mb-3" :disabled="peeking" @click="showCards">
       <i class="fa-solid fa-eye me-2"></i>Show me the cards
     </button>
 
     <!-- Cards -->
-    <div class="row row-cols-3 row-cols-md-4 g-3">
+    <TransitionGroup name="cards" tag="div" class="row row-cols-3 row-cols-md-4 g-3">
       <div v-for="card in cards" :key="card.id" class="col">
         <button
-          class="memory-card w-100 p-0 position-relative d-flex flex-column align-items-center justify-content-center gap-1 rounded-4 shadow-sm"
-          :class="{ up: isFaceUp(card) && !card.matched, matched: card.matched }"
+          class="memory-card w-100 p-0"
+          :class="{ flipped: isFaceUp(card), matched: card.matched, wrong: card.wrong }"
           :aria-label="isFaceUp(card) ? card.label : 'Hidden card'"
           @click="selectCard(card)"
         >
-          <template v-if="isFaceUp(card)">
-            <span
-              v-if="card.matched"
-              class="check position-absolute top-0 end-0 m-1 rounded-circle d-flex align-items-center justify-content-center"
-              aria-hidden="true"
-            >
-              <i class="fa-solid fa-check"></i>
+          <span class="card-inner">
+            <!-- Face down -->
+            <span class="face back">
+              <span class="card-back d-flex align-items-center justify-content-center rounded-3">
+                <i class="fa-solid fa-location-dot fa-lg"></i>
+              </span>
             </span>
-            <span class="fs-2 lh-1">{{ card.value }}</span>
-            <span class="fw-bold small">{{ card.label }}</span>
-          </template>
 
-          <span v-else class="card-back d-flex align-items-center justify-content-center rounded-3">
-            <i class="fa-solid fa-location-dot fa-lg"></i>
+            <!-- Face up -->
+            <span class="face front">
+              <span
+                v-if="card.matched"
+                class="check position-absolute top-0 end-0 m-1 rounded-circle d-flex align-items-center justify-content-center"
+                aria-hidden="true"
+              >
+                <i class="fa-solid fa-check"></i>
+              </span>
+              <img :src="card.image" alt="" class="card-img" />
+              <span class="fw-bold small">{{ card.label }}</span>
+            </span>
           </span>
         </button>
       </div>
-    </div>
+    </TransitionGroup>
 
     <!-- Restart -->
     <div class="text-center">
@@ -165,16 +181,46 @@ function isFaceUp(card) {
 </template>
 
 <style scoped>
+
+
 .memory-card {
     aspect-ratio: 1;
-    border: 2px solid var(--blue);
-    background: var(--blue);
+    border: 0;
+    background: none;
+    perspective: 800px;
     color: var(--ink);
 }
 
-.memory-card:focus-visible {
-    outline: 3px solid var(--gold);
-    outline-offset: 2px;
+.card-inner {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transition: transform 0.5s ease;
+}
+
+.memory-card.flipped .card-inner {
+    transform: rotateY(180deg);
+}
+
+.face {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    border-radius: 1rem;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    box-shadow: 0 3px 6px #0002;
+}
+
+.face.back {
+    background: var(--blue);
+    border: 2px solid var(--blue);
 }
 
 .card-back {
@@ -184,15 +230,38 @@ function isFaceUp(card) {
     color: #fff;
 }
 
-.memory-card.up {
+.face.front {
+    transform: rotateY(180deg);
     background: #fffdf6;
-    border-color: var(--gold);
+    border: 2px solid var(--gold);
     box-shadow: 0 0 0 2px var(--gold);
 }
 
-.memory-card.matched {
+.memory-card.matched .face.front {
     background: #e4efdc;
     border-color: var(--green);
+    box-shadow: 0 3px 6px #0002;
+}
+
+.memory-card:focus-visible {
+    outline: 3px solid var(--gold);
+    outline-offset: 2px;
+}
+
+.card-img {
+    width: 55%;
+    aspect-ratio: 1;
+    object-fit: contain;
+}
+
+.memory-card.matched {
     cursor: default;
+    animation: pop 0.5s ease 0.45s;   /* waits for the flip to finish */
+}
+
+@keyframes pop {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.12); }
+    100% { transform: scale(1); }
 }
 </style>

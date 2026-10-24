@@ -2,7 +2,8 @@
 import { ref, computed } from 'vue'
 import GameLayout from '../../components/games/GameLayout.vue'
 import GameProgress from '../../components/games/GameProgress.vue'
-
+import { useGameReward } from '@/lib/gamereward'
+const { reward, claim, reset } = useGameReward('object-id')
 const items = [
     { emoji: '🍎', name: 'Apple' },
     { emoji: '🚗', name: 'Car' },
@@ -56,6 +57,7 @@ function choose(option) {
     setTimeout(() => {
         if (current.value === TOTAL_ROUNDS - 1) {
             finished.value = true
+            claim({ score: score.value })
         } else {
             current.value++
         }
@@ -76,6 +78,7 @@ function restartGame() {
     results.value = []
     chosen.value = null
     finished.value = false
+    reset();
 }
 
 const instruction = computed(() =>
@@ -105,7 +108,10 @@ const speech = computed(() =>
       :total="TOTAL_ROUNDS"
       :results="results"
     />
-
+    <div v-if="reward" class="text-center fw-bold mt-4" aria-live="polite">
+      <i class="fa-solid fa-star text-gold me-2"></i>
+      You earned {{ reward.earned.xp }} XP and {{ reward.earned.coins }} coins.
+    </div><br>
     <template v-if="!finished">
 
       <!-- Object -->

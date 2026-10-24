@@ -22,6 +22,9 @@ import profile from "../views/profile-page.vue"
 /* Collection */
 import collection from "../components/charactercollection.vue"
 
+/* Map */
+import mapView from "../views/map.vue" 
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -52,13 +55,7 @@ const router = createRouter({
       path: "/spirits",
       component: collection,
       meta: { requiresAuth: true }
-    },
-    {
-      path: "/me",
-      component: profile,
-      meta: {requiresAuth: true}
     }
-
   ],
 })
 
