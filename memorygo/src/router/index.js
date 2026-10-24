@@ -17,6 +17,7 @@ import sequence from "../views/games/sequence.vue"
 import pattern from "../views/games/pattern.vue"
 import missing from "../views/games/missing.vue"
 import oddoneout from "../views/games/oddoneout.vue"
+import profile from "../views/profile-page.vue"
 
 /* Collection */
 import collection from "../components/charactercollection.vue"
@@ -51,6 +52,11 @@ const router = createRouter({
       path: "/spirits",
       component: collection,
       meta: { requiresAuth: true }
+    },
+    {
+      path: "/me",
+      component: profile,
+      meta: {requiresAuth: true}
     }
 
   ],
