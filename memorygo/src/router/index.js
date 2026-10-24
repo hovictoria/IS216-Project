@@ -17,13 +17,15 @@ import sequence from "../views/games/sequence.vue"
 import pattern from "../views/games/pattern.vue"
 import missing from "../views/games/missing.vue"
 import oddoneout from "../views/games/oddoneout.vue"
-import profile from "../views/profile-page.vue"
 
 /* Collection */
 import collection from "../components/charactercollection.vue"
 
 /* Map */
 import mapView from "../views/map.vue" 
+
+/* Profile */
+import profile from "../views/profile-page.vue"
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -45,7 +47,6 @@ const router = createRouter({
       path: "/games",
       component: memory
     },
-
     {
       path: "/menu",
       component: main,
@@ -55,6 +56,16 @@ const router = createRouter({
       path: "/spirits",
       component: collection,
       meta: { requiresAuth: true }
+    },
+    {
+      path: "/map",
+      component: mapView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: "/me",
+      component: profile,
+      meta: {requiresAuth: true}
     }
   ],
 })
