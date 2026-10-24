@@ -2,6 +2,9 @@
 import { ref, computed, onBeforeUnmount } from 'vue'
 import GameLayout from '../../components/games/GameLayout.vue'
 import GameProgress from '../../components/games/GameProgress.vue'
+import { useGameReward } from '@/lib/gamereward'
+
+const { reward, claim, reset } = useGameReward('sequence')
 
 const pads = [
     { id: 0, emoji: '🌸' },
@@ -44,6 +47,7 @@ async function showSequence() {
 function nextRound() {
     sequence.value.push(Math.floor(Math.random() * pads.length))
     showSequence()
+    reset();
 }
 
 function startGame() {
@@ -61,6 +65,7 @@ async function pressPad(padId) {
     if (padId !== sequence.value[playerIndex.value]) {
         best.value = Math.max(best.value, sequence.value.length - 1)
         status.value = 'lost'
+        if (level.value > 1) claim({ level: level.value - 1 })
         return
     }
 
@@ -99,7 +104,10 @@ const speech = computed(() => `Sequence Recall. ${message.value}`)
         </span>
       </template>
     </GameProgress>
-
+    <div v-if="reward" class="text-center fw-bold mt-4" aria-live="polite">
+        <i class="fa-solid fa-star text-gold me-2"></i>
+        You earned {{ reward.earned.xp }} XP and {{ reward.earned.coins }} coins.
+    </div><br>
     <!-- Pads -->
     <div class="pads mx-auto mt-4">
       <div class="row row-cols-2 g-3">

@@ -2,6 +2,9 @@
 import { ref, computed } from 'vue'
 import GameLayout from '../../components/games/GameLayout.vue'
 import GameProgress from '../../components/games/GameProgress.vue'
+import { useGameReward } from '@/lib/gamereward'
+
+const { reward, claim, reset } = useGameReward('pattern')
 
 const symbols = ['🌸', '🐶', '🌳', '🐘', '⭐', '🍎']
 const TOTAL_ROUNDS = 5
@@ -56,6 +59,7 @@ function choose(option) {
     setTimeout(() => {
         if (roundNumber.value === TOTAL_ROUNDS) {
             finished.value = true
+            claim({ score: score.value })
         } else {
             roundNumber.value++
             round.value = createRound()
@@ -77,6 +81,7 @@ function restartGame() {
     chosen.value = null
     finished.value = false
     round.value = createRound()
+    reset();
 }
 
 const instruction = computed(() =>
@@ -102,7 +107,10 @@ const speech = computed(() => `Pattern Recognition. ${instruction.value}`)
       :total="TOTAL_ROUNDS"
       :results="results"
     />
-
+    <div v-if="reward" class="text-center fw-bold mt-4" aria-live="polite">
+        <i class="fa-solid fa-star text-gold me-2"></i>
+        You earned {{ reward.earned.xp }} XP and {{ reward.earned.coins }} coins.
+    </div><br>
     <template v-if="!finished">
 
       <!-- Pattern -->

@@ -16,10 +16,10 @@ import cors from 'cors'
 import meRoutes from './routes/me.js'
 
 import spiritsRoutes from './routes/spirits.js'
-
+import streakRoutes from './routes/streak.js'
 
 const PORT = Number(process.env.PORT) || 8000
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173'
+const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173' 
 
 // Create an express app
 const app = express()
@@ -28,14 +28,13 @@ app.use(cors({ origin: CLIENT_ORIGIN }))   // only our Vue app may call this API
 app.use(express.json())                    // parse JSON request bodies into req.body
 
 
-
-
 // ---------- Routes ----------
 // One line per feature file in routes/
 app.use('/api/me', meRoutes)
 
 app.use('/api/spirits', spiritsRoutes)
 
+app.use('/api/progress', streakRoutes)
 
 
 

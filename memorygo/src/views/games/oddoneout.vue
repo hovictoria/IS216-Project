@@ -2,6 +2,9 @@
 import { ref, computed } from 'vue'
 import GameLayout from '../../components/games/GameLayout.vue'
 import GameProgress from '../../components/games/GameProgress.vue'
+import { useGameReward } from '@/lib/gamereward'
+
+const { reward, claim, reset } = useGameReward('odd-one-out')
 
 const categories = {
     fruit: ['🍎', '🍌', '🍇', '🍓', '🍊', '🍉'],
@@ -48,6 +51,7 @@ function choose(option) {
 function nextRound() {
     if (roundNumber.value === TOTAL_ROUNDS) {
         finished.value = true
+        claim({ score: score.value })
         return
     }
     roundNumber.value++
@@ -61,6 +65,7 @@ function restartGame() {
     results.value = []
     chosen.value = null
     finished.value = false
+    reset();
 }
 
 function optionClass(option) {
@@ -96,7 +101,10 @@ const speech = computed(() => `Odd One Out. ${instruction.value}`)
       :total="TOTAL_ROUNDS"
       :results="results"
     />
-
+    <div v-if="reward" class="text-center fw-bold mt-4" aria-live="polite">
+        <i class="fa-solid fa-star text-gold me-2"></i>
+        You earned {{ reward.earned.xp }} XP and {{ reward.earned.coins }} coins.
+    </div><br>
     <template v-if="!finished">
 
       <!-- Options -->

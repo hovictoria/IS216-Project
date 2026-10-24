@@ -12,6 +12,7 @@ export const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api',
 })
 
+
 // Get the user token from the browser
 api.interceptors.request.use(async (config) => {
     const { data } = await supabase.auth.getSession()
