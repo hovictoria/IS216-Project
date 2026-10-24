@@ -5,11 +5,11 @@ import GameProgress from '../../components/games/GameProgress.vue'
 
 import { useGameReward } from '@/lib/gamereward'
 import flour from '@/assets/flour.webp'
-/* import kopiImg from '@/assets/cards/kopi.png'
-import orchidImg from '@/assets/cards/orchid.png'
-import mrtImg from '@/assets/cards/mrt.png'
-import strawberryImg from '@/assets/cards/strawberry.png'
-import merlionImg from '@/assets/cards/merlion.png' */
+import nutella from '@/assets/nutella.webp'
+import apples from '@/assets/apples.png'
+import blueberry from '@/assets/blueberry.png'
+import oats from '@/assets/oats.webp'
+import pizza from '@/assets/pizza.webp'
 const { reward, claim, reset } = useGameReward('memory')
 function shuffle(array) {
     const arr = [...array]
@@ -22,12 +22,13 @@ function shuffle(array) {
 
 // 6 pairs = 12 cards
 const items = [
-    { value: 'flour', label: 'flour',image:flour },
-    { value: '☕', label: 'Kopi',image:flour },
-    { value: '🌸', label: 'Orchid',image:flour },
-    { value: '🚆', label: 'MRT',image:flour },
-    { value: '🍓', label: 'Strawberry',image:flour},
-    { value: '🦁', label: 'Merlion',image:flour }
+    { value: 'flour', label: 'flour', image:flour },
+    { value: 'nutella', label: 'nutella', image:nutella },
+    { value: 'apples', label: 'apples', image:apples },
+    { value: 'blueberry', label: 'blueberry', image:blueberry },
+    { value: 'oats', label: 'oats', image:oats },
+    { value: 'pizza', label: 'pizza', image:pizza }
+    
 ]
 
 const cards = ref(shuffle(
@@ -122,15 +123,16 @@ function isFaceUp(card) {
     desktop-intro="Memory Match. Click two cards to find a pair. There's no rush."
     :speech="speech"
     exit-to="/map"
+    wide
   >
     <GameProgress
       :label="`You've found ${pairsFound} of ${totalPairs} pairs.`"
       :total="totalPairs"
       :results="pairResults"
     />
-    <div v-if="reward" class="text-center fw-bold mt-4" aria-live="polite">
-      <i class="fa-solid fa-star text-gold me-2"></i>
-      You earned {{ reward.earned.xp }} XP and {{ reward.earned.coins }} coins.
+    <div v-if="reward" class="text-center fw-bold mt-4" aria-live="polite" name="rise">
+    <i class="fa-solid fa-star text-gold me-2"></i>
+    You earned {{ reward.earned.xp }} XP and {{ reward.earned.coins }} coins.
     </div><br>
     <button class="btn btn-memory w-100 fw-bold py-2 mb-3" :disabled="peeking" @click="showCards">
       <i class="fa-solid fa-eye me-2"></i>Show me the cards
@@ -163,7 +165,7 @@ function isFaceUp(card) {
                 <i class="fa-solid fa-check"></i>
               </span>
               <img :src="card.image" alt="" class="card-img" />
-              <span class="fw-bold small">{{ card.label }}</span>
+              <span class="card-label fw-bold">{{ card.label }}</span>
             </span>
           </span>
         </button>
@@ -257,6 +259,56 @@ function isFaceUp(card) {
 .memory-card.matched {
     cursor: default;
     animation: pop 0.5s ease 0.45s;   /* waits for the flip to finish */
+}
+
+.card-label {
+    font-size: 0.95rem;
+}
+
+.memory-card .check {
+    width: 20px;
+    height: 20px;
+}
+.memory-card.wrong {
+    animation: shake 0.5s ease 0.4s;   /* waits for the flip to finish */
+}
+.cards-move {
+    transition: transform 0.6s ease;
+}
+.rise-enter-active {
+    transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.rise-enter-from {
+    opacity: 0;
+    transform: translateY(12px);
+}
+.dot.filled {
+    animation: dot-pop 0.4s ease;
+}
+
+@keyframes dot-pop {
+    0%   { transform: scale(0.4); }
+    60%  { transform: scale(1.3); }
+    100% { transform: scale(1); }
+}
+@media (min-width: 768px) {
+    .card-img {
+        width: 62%;
+    }
+
+    .card-label {
+        font-size: 1.25rem;
+    }
+
+    .card-back i {
+        font-size: 2.2rem;
+    }
+
+    .memory-card .check {
+        width: 30px;
+        height: 30px;
+        font-size: 16px;
+    }
 }
 
 @keyframes pop {
