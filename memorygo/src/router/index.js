@@ -25,7 +25,7 @@ import collection from "../components/charactercollection.vue"
 import mapView from "../views/map.vue" 
 
 /* Profile */
-import profile from "../views/profile-page.vue"
+import profile from "../views/profile.vue"
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),

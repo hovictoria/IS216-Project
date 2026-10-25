@@ -1,6 +1,6 @@
-
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
+import { stations } from '@/data/stations'
 import AppMenu from '@/components/menu.vue'
 import { useAuthStore } from '@/stores/auth'
 
@@ -10,8 +10,8 @@ const auth = useAuthStore()
 const level = ref(3)
 const xp = ref(170)
 const coins = ref(45)
-const completedStations = ref(4)
-const totalStations = ref(10)
+const completedStations = ref(0)
+const totalStations = stations.length
 
 const xpForNextLevel = 250
 
@@ -24,8 +24,43 @@ const progressPercentage = computed(() =>
 )
 
 const stationPercentage = computed(() =>
-  Math.round((completedStations.value / totalStations.value) * 100)
+  totalStations > 0
+    ? Math.round((completedStations.value / totalStations.value) * 100)
+    : 0
 )
+
+function loadStationProgress() {
+  const userId = auth.user?.id 
+
+  if (!userId) {
+    completedStations.value = 0
+    return
+  }
+
+  const saveKey = `memorygo-stations-${userId}`
+
+  try {
+    const saved = localStorage.getItems(saveKey)
+    const completedIds = saved ? JSON.parse(saved) : []
+
+    if (!Array.isArray(completedIds)) {
+      completedStations.value = 0
+      return
+    }
+
+    completedStations.value = stations.filter(
+      station => completedIds.includes(station.id)
+    ).length
+
+  } catch (error) {
+    console.error('Failed to load station progress:', error)
+    completedStations.value = 0
+  }
+}
+
+onMounted(() => {
+  loadStationProgress()
+})
 </script>
 
 <template>
