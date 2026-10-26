@@ -4,6 +4,7 @@ import AppMenu from '@/components/menu.vue'        // the sidebar
 // import { spirits, foundIds } from '../data/spirits.js' //testing data 
 
 import { api } from '@/lib/api'  //helper for calling the server
+import { stations } from '@/data/stations'   // Yule's station list (id, name, emoji, lat, lng)
 
 const readAloud = ref(false)                       // the sidebar's on/off switch needs this
 
@@ -34,6 +35,23 @@ const isFound = (id) => found.value.some((f) => f.spirit_id === id)
 
 // return the whole row, so can get the collected_at for the date
 const getFoundRow = (id) => found.value.find((f) => f.spirit_id === id)
+
+// find the station where this spirit was found, e.g. { id: 6, name: "Fort Canning Park", ... }
+// returns null if the spirit isn't found yet, or has no station
+const getStation = (spiritId) => {
+    const row = getFoundRow(spiritId)
+    if (!row || row.station_id == null) return null
+    return stations.find((st) => st.id === row.station_id) ?? null
+}
+
+// which card is flipped over right now (null = none). Only one at a time keeps it simple.
+const flippedId = ref(null)
+
+// tap a card: flip it, or flip it back if it's already flipped. ❓ cards don't flip.
+const toggleFlip = (id) => {
+    if (!isFound(id)) return
+    flippedId.value = flippedId.value === id ? null : id
+}
 
 // turn the ISO date format to JavaScript object (human-readable)
 // ex: 16 Oct 2026
@@ -122,18 +140,45 @@ onMounted(async () => {
                 <!-- cards in this category (respects the All/Found buttons) -->
                 <div class="row g-3">
                 <div v-for="s in spiritsIn(c.value)" :key="s.id" class="col-6 col-md-3">
-                    <div class="h-100 card text-center p-3" :class="{ locked: !isFound(s.id) }">
+                    <!-- the flippable card: tap (or Enter/Space on a keyboard) to turn it over -->
+                    <div
+                        class="flip-card h-100"
+                        :class="{ flipped: flippedId === s.id, clickable: isFound(s.id) }"
+                        :role="isFound(s.id) ? 'button' : null"
+                        :tabindex="isFound(s.id) ? 0 : -1"
+                        :aria-pressed="isFound(s.id) ? flippedId === s.id : null"
+                        @click="toggleFlip(s.id)"
+                        @keydown.enter.prevent="toggleFlip(s.id)"
+                        @keydown.space.prevent="toggleFlip(s.id)"
+                        @mouseleave="flippedId = null"
+                    >
+                        <div class="flip-inner">
 
-                        <!-- show spirit emoji -->
-                        <div class="display-4">{{ isFound(s.id) ? s.emoji : '❓' }}</div>
+                            <!-- FRONT: same as before -->
+                            <div class="flip-front card text-center p-3" :class="{ locked: !isFound(s.id) }">
 
-                        <!-- show spirit name -->
-                        <h5>{{ isFound(s.id) ? s.name : '???' }}</h5>
+                                <!-- show spirit emoji -->
+                                <div class="display-4">{{ isFound(s.id) ? s.emoji : '❓' }}</div>
 
-                        <!-- show date if the spirit is found -->
-                        <p v-if="isFound(s.id)" class="found-date mb-0">
-                            Found on: {{ formatDate(getFoundRow(s.id).collected_at) }}
-                        </p>
+                                <!-- show spirit name -->
+                                <h5>{{ isFound(s.id) ? s.name : '???' }}</h5>
+
+                                <!-- show date if the spirit is found -->
+                                <p v-if="isFound(s.id)" class="found-date mb-0">
+                                    Found on: {{ formatDate(getFoundRow(s.id).collected_at) }}
+                                </p>                            </div>
+
+                            <!-- BACK: where it was found (only found cards have a back) -->
+                            <div v-if="isFound(s.id)" class="flip-back card text-center p-3">
+                                <p class="mb-1">📍 Found at</p>
+                                <template v-if="getStation(s.id)">
+                                    <div class="display-5">{{ getStation(s.id).emoji }}</div>
+                                    <h5 class="mb-0">{{ getStation(s.id).name }}</h5>
+                                </template>
+                                <h5 v-else class="mb-0">Location not recorded</h5>
+                            </div>
+
+                        </div>
                     </div>
                 </div>
                 </div>
@@ -157,6 +202,56 @@ onMounted(async () => {
     color: var(--ink-soft);
 }
 
+    /* the flip container: perspective makes the turn look 3D instead of flat */
+    .flip-card {
+    perspective: 1000px;
+    }
+    .flip-card.clickable {
+    cursor: pointer;
+    }
+
+    /* holds both faces; this is the part that actually rotates */
+    .flip-inner {
+    position: relative;
+    height: 100%;
+    transition: transform 0.5s;
+    transform-style: preserve-3d;
+    }
+
+    /* flipped: turn the whole card over */
+    .flip-card.flipped .flip-inner {
+    transform: rotateY(180deg);
+    }
+
+    /* computer: flip as soon as the mouse is over a found card (phones have no hover, so they use tap) */
+    @media (hover: hover) {
+    .flip-card.clickable:hover .flip-inner {
+        transform: rotateY(180deg);
+    }
+    }
+
+    /* both faces: hide whichever side is facing away */
+    .flip-front,
+    .flip-back {
+    height: 100%;
+    backface-visibility: hidden;
+    }
+
+    /* the back sits exactly on top of the front, already turned around */
+    .flip-back {
+    position: absolute;
+    inset: 0;
+    transform: rotateY(180deg);
+    justify-content: center;
+    }
+
+    /* users who turn off animations in their settings get an instant flip */
+    @media (prefers-reduced-motion: reduce) {
+    .flip-inner {
+        transition: none;
+    }
+    }
+
     /* category section heading, e.g. "🌸 Flowers" (~26px, matches the dashboard's card titles) */
     .section-title {
     font-size: 1.6rem;
@@ -175,7 +270,7 @@ onMounted(async () => {
     color: var(--ink-soft);
     }
 
-    /* NEW: same layout rules as main.vue */
+    /* same layout rules as main.vue */
     .app-shell {
     min-height: 100vh;
     background: var(--bg);
