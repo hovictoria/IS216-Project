@@ -5,8 +5,14 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { stations, areas } from '../data/stations'
 import { useAuthStore } from '../stores/auth'
 import AppMenu from '@/components/menu.vue'
+//system progression
+import { useProgression } from '@/composables/useProgression'
+import { areaUnlockLevel } from '@/config/progression'
+
+
 
 const SMU = [103.8502, 1.2963]
+const { refreshProgress, canEnterArea } = useProgression()
 
 // landing page colours (from SplashMap.vue)
 const C = {
@@ -79,10 +85,15 @@ function saveProgress() {
 // stations this player has completed (loaded from saved progress)
 const completedIds = ref(loadProgress())
 
+// function isAreaUnlocked(areaId) {
+//     if (areaId === 1) return true
+//     const previousStations = stations.filter((s) => s.area === areaId - 1)
+//     return previousStations.every((s) => completedIds.value.includes(s.id))
+// }
+
+// Areas unlock by level
 function isAreaUnlocked(areaId) {
-    if (areaId === 1) return true
-    const previousStations = stations.filter((s) => s.area === areaId - 1)
-    return previousStations.every((s) => completedIds.value.includes(s.id))
+    return canEnterArea(areaId)
 }
 
 function getStatus(station) {
@@ -122,10 +133,8 @@ function completeStation() {
     saveProgress()
     refreshStations()
 
-    const nextArea = areas.find((a) => a.id === station.area + 1)
-    if (nextArea && isAreaUnlocked(nextArea.id)) {
-        celebrate(`🎉 ${nextArea.name} unlocked!`)
-    } else if (completedIds.value.length === stations.length) {
+    // Area unlocks now come from levelling up (LevelUpNotice)
+    if (completedIds.value.length === stations.length) {
         celebrate("🏆 You've completed every station!")
     }
 }
@@ -153,10 +162,24 @@ const arriveRadius = computed(() => {
 
 const isNear = computed(() => distance.value <= arriveRadius.value)
 
+// const statusText = {
+//     available: '🟢 Available',
+//     completed: '✅ Completed. Well done!',
+//     locked: '🔒 Locked: finish the previous area first',
+// }
+
 const statusText = {
     available: '🟢 Available',
     completed: '✅ Completed. Well done!',
-    locked: '🔒 Locked: finish the previous area first',
+}
+
+// Locked stations say which level the player needs
+function statusLabel(station) {
+    const status = getStatus(station)
+    if (status === 'locked') {
+        return `🔒 Locked: reach Level ${areaUnlockLevel(station.area)} to unlock`
+    }
+    return statusText[status]
 }
 
 // move the character and remember where they are
@@ -254,6 +277,9 @@ onMounted(() => {
             .setLngLat([station.lng, station.lat])
             .addTo(map)
     }
+
+    // Get the player's XP, then redraw stations so the right areas unlock
+    refreshProgress().then(refreshStations).catch(console.error)
     
     // add player
     const playerE1 = document.createElement('div')
@@ -339,7 +365,7 @@ onUnmounted(() => {
         <div v-if="selected" class="station-card">
         <button class="close-btn" @click="selected=null">x</button>
         <h2> {{ selected.emoji }} {{ selected.name }}</h2>
-        <p>{{ statusText[getStatus(selected)] }}</p>
+        <p>{{ statusLabel(selected) }}</p>
 
         <template v-if="getStatus(selected) === 'available'">
             <p v-if="isNear">You're here! 🎉</p>

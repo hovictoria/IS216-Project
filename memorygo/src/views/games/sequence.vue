@@ -4,6 +4,8 @@ import GameLayout from '../../components/games/GameLayout.vue'
 import GameProgress from '../../components/games/GameProgress.vue'
 import { useGameReward } from '@/lib/gamereward'
 
+import LevelUpNotice from '@/components/LevelUpNotice.vue'
+
 const { reward, claim, reset } = useGameReward('sequence')
 
 const pads = [
@@ -108,6 +110,8 @@ const speech = computed(() => `Sequence Recall. ${message.value}`)
         <i class="fa-solid fa-star text-gold me-2"></i>
         You earned {{ reward.earned.xp }} XP and {{ reward.earned.coins }} coins.
     </div><br>
+    <LevelUpNotice :reward="reward" />
+    
     <!-- Pads -->
     <div class="pads mx-auto mt-4">
       <div class="row row-cols-2 g-3">

@@ -3,7 +3,7 @@ import { ref, computed } from 'vue';
 
 // Use the Axios instance already configured in your project.
 // It must include the authentication needed by /api/progress.
-import { api } from './api' //@ sign refer to the src folder
+import { api } from '@/lib/api' //@ sign refer to the src folder
 
 import {
   levelFromXp,
