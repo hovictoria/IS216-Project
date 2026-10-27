@@ -6,18 +6,24 @@ import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 
-// Temporary prototype data
+// Temporary Data
 const level = ref(3)
 const xp = ref(170)
 const coins = ref(45)
+
+// Real Progress
 const completedStations = ref(0)
 const totalStations = stations.length
 
 const xpForNextLevel = 250
 
-const displayName = computed(() =>
-  auth.user?.user_metadata?.display_name || 'Memory Go Explorer'
-)
+const displayName = computed(() => {
+  if (auth.user && auth.user.user_metadata && auth.user.user_metadata.display_name) {
+    return auth.user.user_metadata.display_name
+  } else {
+    return 'Memory Go Explorer'
+  }
+})
 
 const progressPercentage = computed(() =>
   Math.min((xp.value / xpForNextLevel) * 100, 100)
@@ -25,7 +31,7 @@ const progressPercentage = computed(() =>
 
 const stationPercentage = computed(() =>
   totalStations > 0
-    ? Math.round((completedStations.value / totalStations.value) * 100)
+    ? Math.round((completedStations.value / totalStations) * 100)
     : 0
 )
 
@@ -40,7 +46,7 @@ function loadStationProgress() {
   const saveKey = `memorygo-stations-${userId}`
 
   try {
-    const saved = localStorage.getItems(saveKey)
+    const saved = localStorage.getItem(saveKey)
     const completedIds = saved ? JSON.parse(saved) : []
 
     if (!Array.isArray(completedIds)) {
@@ -75,7 +81,7 @@ onMounted(() => {
         <p>Look how far you've come!</p>
       </header>
 
-      <!-- User details -->
+      <!-- user details -->
       <section class="profile-card user-card">
         <div class="avatar">👤</div>
 
