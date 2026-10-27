@@ -3,6 +3,9 @@ import { ref, computed } from 'vue'
 import GameLayout from '../../components/games/GameLayout.vue'
 import GameProgress from '../../components/games/GameProgress.vue'
 import { useGameReward } from '@/lib/gamereward'
+
+import LevelUpNotice from '@/components/LevelUpNotice.vue'
+
 const { reward, claim, reset } = useGameReward('object-id')
 const items = [
     { emoji: '🍎', name: 'Apple' },
@@ -112,6 +115,8 @@ const speech = computed(() =>
       <i class="fa-solid fa-star text-gold me-2"></i>
       You earned {{ reward.earned.xp }} XP and {{ reward.earned.coins }} coins.
     </div><br>
+    <LevelUpNotice :reward="reward" />
+    
     <template v-if="!finished">
 
       <!-- Object -->

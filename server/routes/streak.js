@@ -207,4 +207,24 @@ router.post('/xp', requireAuth, async (req, res) => {
         res.status(500).json({ message: 'Could not save your progress.' })
     }
 })
+
+// GET /api/progress → the user's current XP and coins
+router.get('/', requireAuth, async (req, res) => {
+    const { data, error } = await supabase
+        .from(TABLE)
+        .select('xp, coins')
+        .eq('user_id', req.user.id)
+        .maybeSingle()
+
+    if (error) {
+        console.error(error)
+        return res.status(500).json({ message: 'Could not load your progress.' })
+    }
+
+    res.json({ xp: data?.xp ?? 0, coins: data?.coins ?? 0 })
+})
+
+
+
+
 export default router
