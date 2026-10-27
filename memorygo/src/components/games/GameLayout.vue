@@ -12,7 +12,8 @@ const props = defineProps({
     // Text for Read aloud. Defaults to the title + intro.
     speech: { type: String, default: '' },
     // Where the Stop button goes
-    exitTo: { type: String, default: '/map' }
+    exitTo: { type: String, default: '/map' },
+    wide: { type: Boolean, default: false },
 })
 
 // Read-aloud helper: start, stop, or toggle. Stops automatically when the
@@ -90,7 +91,7 @@ const textToRead = computed(() => props.speech || `${props.title}. ${props.intro
       <span v-else></span>
     </header>
 
-    <main class="game-main mx-auto px-3 pt-2 pt-md-4 pb-5">
+    <main class="game-main mx-auto px-3 pt-2 pt-md-4 pb-5" :class="{ wide }">
 
       <!-- Game introduction -->
       <div class="text-start text-md-center mb-3">
@@ -194,5 +195,10 @@ const textToRead = computed(() => props.speech || `${props.title}. ${props.intro
     background: var(--green);
     color: #fff;
     font-size: 11px;
+}
+@media (min-width: 768px) {
+    .game-page .game-main.wide {
+        max-width: 800px;
+    }
 }
 </style>

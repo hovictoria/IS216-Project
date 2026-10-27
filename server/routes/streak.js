@@ -179,7 +179,7 @@ router.post('/xp', requireAuth, async (req, res) => {
         const status = await recordPlay(req.user.id)
 
         const { data: row, error } = await supabase
-            .from('progress')
+            .from(TABLE)
             .select('xp, coins')
             .eq('user_id', req.user.id)
             .single()
