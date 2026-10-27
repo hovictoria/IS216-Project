@@ -16,7 +16,7 @@ create table public.spirits (
 create table public.user_spirits (
   user_id uuid not null references auth.users(id) on delete cascade,
   spirit_id int not null references public.spirits(id),
-  station_id text,
+  station_id int,   -- matches the station ids in memorygo/src/data/stations.js
   collected_at timestamptz not null default now(),
   primary key (user_id, spirit_id)
 );
