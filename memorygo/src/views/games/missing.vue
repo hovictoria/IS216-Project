@@ -101,6 +101,7 @@ const speech = computed(() => `What's missing? ${instruction.value}`)
     :desktop-intro="instruction"
     :speech="speech"
     exit-to="/map"
+    wide
   >
     <GameProgress
       :label="`Round ${finished ? TOTAL_ROUNDS : roundNumber} of ${TOTAL_ROUNDS}. ${score} correct.`"
