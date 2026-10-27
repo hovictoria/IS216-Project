@@ -80,7 +80,7 @@ async function loadProfileProgress() {
     if (profile.coins !== undefined && profile.coins !== null) {
       const latestCoins = Number(profile.coins)
 
-      if (Number.isFinite(lastestCoins) && latestCoins >= 0) {
+      if (Number.isFinite(latestCoins) && latestCoins >= 0) {
         coins.value = latestCoins
         hasCoins.value = true
       }
@@ -186,11 +186,21 @@ watch(
           Loading progress...
         </p>
 
-        <div v-else-if="errorMessage">
-          <p class="error-message">{{ errorMessage }}</p>
- 
-          <button class="retry-button" @click="loadProfileProgress">
-            Try again
+        <div v-else-if="errorMessage" class="error-box">
+          <div class="error-icon">↻</div>
+          <p class="error-title">
+            Your progress couldn't be loaded
+          </p>
+
+          <p class="error-description">
+            Please try again in a moment.
+          </p>
+
+          <button
+            class="retry-button"
+            @click="loadProfileProgress"
+          >
+            Try Again
           </button>
         </div>
 
@@ -462,5 +472,48 @@ watch(
   .stat-value {
     font-size: 1.8rem;
   }
+}
+.error-box {
+  text-align: center;
+  padding: 20px 10px;
+}
+
+.error-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  background: #f5e8d8;
+  color: #a64f31;
+  font-size: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.error-title {
+  font-weight: 800;
+  color: #2a2018;
+  margin-bottom: 5px;
+}
+
+.error-description {
+  color: #6b5d4d;
+  font-size: 0.9rem;
+  margin-bottom: 16px;
+}
+
+.retry-button {
+  background: #a64f31;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 10px 24px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.retry-button:hover {
+  background: #7d3a22;
 }
 </style>
