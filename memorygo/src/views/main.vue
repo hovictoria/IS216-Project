@@ -66,6 +66,20 @@ onMounted(
   }
 )
 
+// daily spirit: true once the player has found a spirit today (shows check on step 3 of Today's plan)
+const spiritToday = ref(false);
+
+// load whether the player has found a spirit today
+// separate from the streak's onMounted, so if one fails the other still works
+onMounted(async () => {
+  try {
+    const { data } = await api.get('/spirits/today')
+    spiritToday.value = data.foundToday
+  } catch (error) {
+    console.log(error)
+  }
+})
+
 /* ---------- Read aloud ---------- */
 const readAloud = ref(true);
 const mainEl = ref(null);
@@ -157,6 +171,21 @@ function startGame() {
                     <div class="step-title">Take a walk to {{ walk.stops[0].name }}</div>
                     <div class="step-sub">
                       {{ walk.stops[0].distance }} from home. Your phone will show you the way.
+                    </div>
+                  </div>
+                </li>
+                <!-- step 3: daily spirit bonus (number turns into a green ✓ once a spirit is found today) -->
+                <li class="step">
+                  <span class="step-num" :class="spiritToday ? 'done' : 'outlined'">
+                    <i v-if="spiritToday" class="fa-solid fa-check" aria-hidden="true"></i>
+                    <template v-else>3</template>
+                  </span>
+                  <div>
+                    <div class="step-title">
+                      {{ spiritToday ? "Today's spirit found!" : "Find today's spirit 🌟" }}
+                    </div>
+                    <div class="step-sub">
+                      {{ spiritToday ? "Come back tomorrow for another guaranteed spirit." : "Your first station today always gives you a spirit." }}
                     </div>
                   </div>
                 </li>
@@ -468,6 +497,11 @@ h1 {
 .step-num.outlined {
   border: 2px solid var(--blue);
   color: var(--blue);
+}
+/* step 3 once today's spirit is found: green circle with a tick (matches the "This week" ticks) */
+.step-num.done {
+  background: var(--green);
+  color: #fff;
 }
 .step-num.dark {
   width: 36px;
