@@ -24,6 +24,9 @@ import collection from "../components/charactercollection.vue"
 /* Map */
 import mapView from "../views/map.vue" 
 
+/* Profile */
+import profile from "../views/profile.vue"
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -44,7 +47,6 @@ const router = createRouter({
       path: "/games",
       component: memory
     },
-
     {
       path: "/menu",
       component: main,
@@ -59,6 +61,11 @@ const router = createRouter({
       path: "/map",
       component: mapView,
       meta: { requiresAuth: true }
+    }, 
+    {
+      path: "/me",
+      component: profile,
+      meta: {requiresAuth: true}
     },
     {
       path: "/games/memory",
