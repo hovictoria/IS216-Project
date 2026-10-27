@@ -61,12 +61,38 @@ const router = createRouter({
       path: "/map",
       component: mapView,
       meta: { requiresAuth: true }
-    },
+    }, 
     {
       path: "/me",
       component: profile,
       meta: {requiresAuth: true}
-    }
+    },
+    {
+      path: "/games/memory",
+      component: memory,
+      meta: { requiresAuth: true }
+    },
+    { path: "/games/object",
+      component: object,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: "/games/oddoneout",
+      component: oddoneout,
+      meta: { requiresAuth: true }
+    },
+    { path: "/games/pattern",
+      component: pattern,
+      meta: { requiresAuth: true }
+    },
+    { path: "/games/missing",
+      component: missing,
+      meta: { requiresAuth: true }
+    },
+    { path: "/games/sequence",
+      component: sequence,
+      meta: { requiresAuth: true }
+    },
   ],
 })
 

@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { api } from './api'
+import { levelFromXp, newUnlocks } from '@/config/progression'
 
 export function useGameReward(game) {
     const reward = ref(null)      // { xp, coins } from the server
@@ -13,7 +14,14 @@ export function useGameReward(game) {
 
         try {
             const { data } = await api.post('/progress/xp', { game, ...result })
-            reward.value = data
+            const before = data.xp - data.earned.xp
+            //...spread operator: It copies every property from one object into a new one
+            reward.value = {
+                ...data,
+                levelBefore: levelFromXp(before),
+                levelAfter: levelFromXp(data.xp),
+                unlocks: newUnlocks(before, data.xp)
+            }
         } catch (error) {
             awarded = false
             console.error(error)
