@@ -5,8 +5,14 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { stations, areas } from '../data/stations'
 import { useAuthStore } from '../stores/auth'
 import AppMenu from '@/components/menu.vue'
+import { useSpiritReward } from '@/lib/spiritreward'      // chance to find a spirit at a station
+import SpiritFound from '@/components/SpiritFound.vue'     // "You found a spirit!" popup
+
 
 const SMU = [103.8502, 1.2963]
+
+// spirit rewards: foundSpirit opens the popup, dismiss closes it
+const { foundSpirit, collect, dismiss } = useSpiritReward()
 
 // landing page colours (from SplashMap.vue)
 const C = {
@@ -121,6 +127,7 @@ function completeStation() {
     completedIds.value.push(station.id)
     saveProgress()
     refreshStations()
+    collect(station.id) //chance to find a spirit here
 
     const nextArea = areas.find((a) => a.id === station.area + 1)
     if (nextArea && isAreaUnlocked(nextArea.id)) {
@@ -306,6 +313,9 @@ onUnmounted(() => {
 <template>
    <div class="map-shell">
         <AppMenu />
+
+        <!-- "You found a spirit!" popup (opens when foundSpirit is set) -->
+        <SpiritFound :spirit="foundSpirit" @close="dismiss" />
 
         <div class="map-page">
         <div ref="mapE1" class="map"></div>

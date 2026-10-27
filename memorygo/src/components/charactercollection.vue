@@ -22,22 +22,22 @@ const categories = [
     { value: 'animal', label: 'Animals', icon: '🐾' },
 ]
 
-///count progress per category
+//count progress per category
 const countTotal = (cat) =>
     spirits.value.filter((s) => s.category === cat).length
 
-// how many of them this user has found
+//how many of them this user has found
 const countFound = (cat) =>
     spirits.value.filter((s) => s.category === cat && isFound(s.id)).length
 
 // const isFound = (id) => foundIds.includes(id)
 const isFound = (id) => found.value.some((f) => f.spirit_id === id)
 
-// return the whole row, so can get the collected_at for the date
+//return the whole row, so can get the collected_at for the date
 const getFoundRow = (id) => found.value.find((f) => f.spirit_id === id)
 
-// find the station where this spirit was found, e.g. { id: 6, name: "Fort Canning Park", ... }
-// returns null if the spirit isn't found yet, or has no station
+//find the station where this spirit was found, e.g. { id: 6, name: "Fort Canning Park", ... }
+//returns null if the spirit isn't found yet, or has no station
 const getStation = (spiritId) => {
     const row = getFoundRow(spiritId)
     if (!row || row.station_id == null) return null
@@ -47,14 +47,14 @@ const getStation = (spiritId) => {
 // which card is flipped over right now (null = none). Only one at a time keeps it simple.
 const flippedId = ref(null)
 
-// tap a card: flip it, or flip it back if it's already flipped. ❓ cards don't flip.
+//tap a card: flip it, or flip it back if it's already flipped. ❓ cards don't flip.
 const toggleFlip = (id) => {
     if (!isFound(id)) return
     flippedId.value = flippedId.value === id ? null : id
 }
 
 // turn the ISO date format to JavaScript object (human-readable)
-// ex: 16 Oct 2026
+//ex: 16 Oct 2026
 const formatDate = (iso) => {
     return new Date(iso).toLocaleDateString('en-SG', {
         day: 'numeric', 

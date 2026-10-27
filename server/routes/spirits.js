@@ -32,7 +32,7 @@ router.get('/', requireAuth, async (req, res) => {
 })
 
 // how likely a player is to find a spirit when they complete a station, set it ard 50%
-const FIND_CHANCE = 1
+const FIND_CHANCE = 0.5
 
 // POST /api/spirits/collect → body: { stationId }
 // Called when a player completes a station, they got a chance to find a new spirit.
