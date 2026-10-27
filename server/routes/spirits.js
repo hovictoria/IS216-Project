@@ -34,6 +34,39 @@ router.get('/', requireAuth, async (req, res) => {
 // how likely a player is to find a spirit when they complete a station, set it ard 50%
 const FIND_CHANCE = 0.5
 
+// today's date in Singapore as 'YYYY-MM-DD' (same approach as streak.js)
+function singaporeToday() {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Singapore' })
+}
+
+// how many spirits this user has found today (since midnight Singapore time)
+// used by /collect (daily bonus) and /today (dashboard ✓)
+// returns { count } or { error }
+async function countFoundToday(userId) {
+    const startOfToday = `${singaporeToday()}T00:00:00+08:00`   // midnight today in Singapore
+    const { count, error } = await supabase
+        .from('user_spirits')
+        .select('spirit_id', { count: 'exact', head: true })   // just count the rows, don't fetch them
+        .eq('user_id', userId)
+        .gte('collected_at', startOfToday)                     // found at or after midnight today
+    return { count, error }
+}
+
+// GET /api/spirits/today → { foundToday: true/false }
+// used by the dashboard to show a check once the player has found a spirit today
+router.get('/today', requireAuth, async (req, res) => {
+    const { count, error } = await countFoundToday(req.user.id)
+
+    if (error) {
+        console.error(error)
+        return res.status(500).json({ message: "Could not check today's spirit." })
+    }
+
+    res.json({ foundToday: count > 0 })   // at least 1 spirit today → true
+})
+
+
+
 // POST /api/spirits/collect → body: { stationId }
 // Called when a player completes a station, they got a chance to find a new spirit.
 // Returns { spirit } if they found one, or { spirit: null } if not this time.
@@ -46,8 +79,19 @@ router.post('/collect', requireAuth, async (req, res) => {
         return res.status(400).json({ message: 'A valid stationId is required.' })
     }
 
-    // 2. Roll the chance. Unlucky = no spirit this time :(
-    if (Math.random() >= FIND_CHANCE) {
+    // 2. Daily bonus: if they haven't found any spirit yet today (Singapore time), it's guaranteed
+    const { count: foundToday, error: todayError } = await countFoundToday(req.user.id)
+
+    if (todayError) {
+        console.error(todayError)
+        return res.status(500).json({ message: 'Could not check your daily bonus.' })
+    }
+
+    const dailyBonus = foundToday === 0
+    const chance = dailyBonus ? 1 : FIND_CHANCE   // 100% for the first spirit of the day, otherwise 50%
+
+    // Roll the chance. Unlucky = no spirit this time :(
+    if (Math.random() >= chance) {
         return res.json({ spirit: null })
     }
 
@@ -98,7 +142,8 @@ router.post('/collect', requireAuth, async (req, res) => {
         return res.status(500).json({ message: 'Could not save your spirit.' })
     }
 
-    res.json({ spirit })
+    // dailyBonus tells the page this was the guaranteed first spirit of the day
+    res.json({ spirit, dailyBonus })
 })
 
 
