@@ -3,6 +3,8 @@ import { ref, computed } from 'vue'
 import GameLayout from '../../components/games/GameLayout.vue'
 import GameProgress from '../../components/games/GameProgress.vue'
 
+import LevelUpNotice from '@/components/LevelUpNotice.vue'
+
 import { useGameReward } from '@/lib/gamereward'
 import flour from '@/assets/flour.webp'
 import nutella from '@/assets/nutella.webp'
@@ -130,12 +132,15 @@ function isFaceUp(card) {
       :total="totalPairs"
       :results="pairResults"
     />
+   
     <Transition name="rise">
-        <div v-if="reward" class="text-center fw-bold mt-4 mb-4" aria-live="polite">
-            <i class="fa-solid fa-star text-gold me-2"></i>
-            You earned {{ reward.earned.xp }} XP and {{ reward.earned.coins }} coins.
-        </div>
+    <div v-if="reward" class="text-center fw-bold mt-4 mb-4" aria-live="polite">
+        <i class="fa-solid fa-star text-gold me-2"></i>
+        You earned {{ reward.earned.xp }} XP and {{ reward.earned.coins }} coins.
+    </div>
     </Transition>
+    
+    <LevelUpNotice :reward="reward" />
     <button class="btn btn-memory w-100 fw-bold py-2 mb-3" :disabled="peeking" @click="showCards">
       <i class="fa-solid fa-eye me-2"></i>Show me the cards
     </button>
