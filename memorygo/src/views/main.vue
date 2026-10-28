@@ -53,7 +53,16 @@ const streakMessage = computed(() =>
 const streak=ref(0);
 const played = ref([]);
 
-
+async function getstreak(){
+  try{
+        await api.post("/progress/init"); 
+        const {data}=await api.get('/progress/streak')
+        streak.value=data.streak;
+        played.value=data.week;
+      }catch(error){
+        console.log(error)
+      }
+}
 // daily spirit: true once the player has found a spirit today (shows check on step 3 of Today's plan)
 const spiritToday = ref(false);
 
@@ -64,9 +73,7 @@ onMounted(async () => {
     const { data } = await api.get('/spirits/today')
     spiritToday.value = data.foundToday
     await api.post("/progress/init"); 
-    const {str}=await api.get('/progress/streak')
-    streak.value=str.streak;
-    played.value=str.week;
+    getstreak();
   } catch (error) {
     console.log(error)
   }
