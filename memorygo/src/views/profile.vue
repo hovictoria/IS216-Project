@@ -5,8 +5,10 @@ import { api } from '@/lib/api'
 import { stations } from '@/data/stations'
 import { levelFromXp, progressToNext } from '@/config/progression'
 import AppMenu from '@/components/menu.vue'
+import { useRouter } from "vue-router";
 
 const auth = useAuthStore()
+const router = useRouter();
 
 // Username
 const displayName = computed(() => {
@@ -125,6 +127,10 @@ function loadStationProgress() {
     console.error('Failed to load station progress:', error)
     completedStations.value = 0
   }
+}
+async function onSignOut() {
+  await auth.signOut();
+  router.push("/");
 }
 
 watch(
@@ -278,7 +284,10 @@ watch(
           🌷 Keep going! You're doing great!
         </p>
       </section>
-
+      <button type="button" class="btn-cta mt-2 d-md-none d-block" @click="onSignOut">
+        <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+        <span>Sign Out</span>
+      </button>
     </div>
   </main>
 </template>
