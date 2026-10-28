@@ -17,6 +17,7 @@ import meRoutes from './routes/me.js'
 
 import spiritsRoutes from './routes/spirits.js'
 import streakRoutes from './routes/streak.js'
+import placesRoutes from './routes/places.js'
 
 const PORT = Number(process.env.PORT) || 8000
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173' 
@@ -35,6 +36,8 @@ app.use('/api/me', meRoutes)
 app.use('/api/spirits', spiritsRoutes)
 
 app.use('/api/progress', streakRoutes)
+
+app.use('/api/places', placesRoutes)
 
 
 

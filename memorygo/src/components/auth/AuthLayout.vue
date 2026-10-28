@@ -1,198 +1,414 @@
 <!--------------------------------------------------------------------------------------------------------
 PSEUDOCODE
-filename:   components/auth/AuthLayout 
-purpose:    provide the background & card with </slot> for both login, sign up, landing pages (used as imports for the three files)
-imports:    imports SplashScene.vue 
+filename:   components/auth/AuthLayout.vue
+purpose:    - the shared frame for landing, login and sign up: sky + 3D island + paper sheet
+            - variant="landing": title on the sky, short sheet with buttons at the bottom
+            - variant="form":    island at the top, tall sheet with the form
+            - phone (< 768px):   everything stacked, sheet rises from the bottom
+            - iPad / laptop:     split screen (landing: text left / island right; form: island left / form right)
+slots:      hero    -> what sits on the sky (landing title)
+            default -> what goes inside the sheet (buttons or a form)
+imports:    SplashScene.vue (the TresJS 3D island)
 ---------------------------------------------------------------------------------------------------------->
 
 <script setup>
-    import SplashScene from './scene/SplashScene.vue';
+import SplashScene from './scene/SplashScene.vue'
+import SkyBackdrop from './SkyBackdrop.vue'
+import appLogo from '@/assets/app-logo.png'      // importing gives Vite's final URL for the image
+
+defineProps({
+    variant: { type: String, default: 'form' },   // 'landing' or 'form'
+})
+
+// Respect the device's "reduce motion" setting: the island stops wiggling
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 </script>
 
 <template>
-    <section class="landing min-vh-100">
-        <div class="scene position-relative overflow-hidden">
-            <!-- Layer 1: sun and hills -->
-            <div class="position-absolute top-0 start-0 w-100 h-100">
-                <span class="sun position-absolute rounded-circle"></span>     
-                <!-- SVG for the hills -->                    
-                <svg class="hills position-absolute bottom-0 start-0 w-100" viewBox="0 0 400 80" preserveAspectRatio="none"> 
-                    <path d="M0 34C60 14 120 12 190 26s140 14 210-6v60H0Z" fill="#CFE0B4" />
-                    <path d="M0 56c70-12 150-14 220-4s120 8 180-2v30H0Z" fill="#B6CF96" />
-                </svg>
-            </div>
+    <section class="auth" :class="`auth--${variant}`">
 
-            <!-- Layer 2: the 3D map -->
-            <div class="canvas-layer position-absolute top-0 start-0 h-100">
-                <SplashScene />
-            </div>
+        <!-- Layer 0: warm sky + faint paper map around the island -->
+        <SkyBackdrop :variant="variant" />
+
+        <!-- Layer 1: the sun and the 3D island floating on the sky -->
+        <span class="sun" aria-hidden="true"></span>
+        <div class="island" aria-hidden="true">
+            <SplashScene :reduced-motion="reducedMotion" />
+            <span v-if="variant === 'landing'" class="psst">
+                <span class="psst-dot"></span>Psst, helloo!
+            </span>
         </div>
 
-        <div class="card-panel position-relative rounded-4 mx-3 p-4">
-            <!-- AuthLayout.vue holds the card Title--> 
-            <h1 class="title m-0 text-center">MemoryGo</h1>
+        <!-- Layer 2: header (landing: logo + Sign in on big screens; form: back button) -->
+        <header class="header">
+            <router-link v-if="variant === 'form'" to="/" class="back" aria-label="Back to start">
+                <span class="back-circle">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M15 5 L8 12 L15 19" />
+                    </svg>
+                </span>
+                <span class="logo back-logo">
+                    <img :src="appLogo" alt="" class="logo-mark" />MemoryGo
+                </span>
+            </router-link>
 
-            <!-- page content goes here -->
-            <slot />
+            <template v-else>
+                <span class="logo">
+                    <img :src="appLogo" alt="" class="logo-mark" />MemoryGo
+                </span>
+                <router-link to="/login" class="header-signin">Sign in</router-link>
+            </template>
+        </header>
+
+        <!-- Layer 3: the content -->
+        <div class="content">
+            <div v-if="$slots.hero" class="hero">
+                <slot name="hero" />
+            </div>
+
+            <div class="sheet">
+                <div class="sheet-inner">
+                    <slot />
+                </div>
+            </div>
         </div>
     </section>
 </template>
 
 <style scoped>
-    /* page */
-    .landing {
+/* =========================================================
+   Phone (default)
+   ========================================================= */
+.auth {
+    position: relative;
+    min-height: 100vh;
+    min-height: 100dvh;           /* dvh ignores the phone's address bar */
+    overflow: hidden;
+    background: var(--sky);
+    color: var(--ink);
+    font-family: var(--font);
+}
+
+/* ---------- island ---------- */
+/* SplashScene fills whatever box it is given, so we only size this box */
+.island {
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 0;
+}
+
+/* phones: the island fills the gap between the tagline and the buttons, spilling a little past
+   both sides like the prototype (a wider + taller box = a bigger island) */
+.auth--landing .island {
+    top: 21%;
+    left: -12%;
+    right: -12%;
+    height: 66%;
+}
+
+/* taller box = bigger island. Its bottom tucks behind the sheet, like the prototype.
+   SplashScene zooms out when its box is narrow, so on phones the box is made wider than the
+   screen (left/right -20%); the island then spills past the edges like in the prototype */
+.auth--form .island {
+    top: -3%;
+    left: -20%;
+    right: -20%;
+    height: 60%;
+}
+
+/* yellow sun in the top-right corner of the landing page (iPad / laptop only) */
+.sun {
+    display: none;
+    position: absolute;
+    top: 11%;
+    right: 3%;
+    z-index: 0;
+    width: clamp(64px, 6.5vw, 96px);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: var(--butter);
+}
+
+/* the dark "Psst, helloo!" label beside the chest */
+.psst {
+    position: absolute;
+    left: 58%;
+    top: 52%;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 12px;
+    border-radius: var(--radius-pill);
+    background: var(--ink);
+    color: var(--white);
+    font-size: 15px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.psst-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--butter);
+}
+
+/* ---------- header ---------- */
+.header {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    right: 16px;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* landing has no header on phones (the title is already big) */
+.auth--landing .header {
+    display: none;
+}
+
+/* logo picture + "MemoryGo" side by side */
+.logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: var(--tracking-tight);
+}
+
+/* the pin image is 4:5 with empty space around it, so it needs to be a bit taller than the text */
+.logo-mark {
+    height: 44px;
+    width: auto;
+}
+
+.back {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--ink);
+    text-decoration: none;
+}
+
+.back-circle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--white);
+    box-shadow: var(--shadow-soft);
+}
+
+.back-circle svg {
+    width: 22px;
+    height: 22px;
+}
+
+/* the logo next to the back button only shows on laptops */
+.back-logo {
+    display: none;
+}
+
+.header-signin {
+    display: flex;
+    align-items: center;
+    height: 46px;
+    padding: 0 20px;
+    border: 1.5px solid var(--ink);
+    border-radius: var(--radius-pill);
+    color: var(--ink);
+    font-size: 16px;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+/* ---------- content ---------- */
+/* fills the screen; hero at the top, sheet pushed to the bottom */
+.content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    min-height: 100dvh;
+    pointer-events: none;         /* let empty space pass through... */
+}
+
+.hero,
+.sheet {
+    pointer-events: auto;         /* ...but the real content is clickable */
+}
+
+.hero {
+    padding: 52px var(--gutter) 0;
+    text-align: center;
+}
+
+.sheet {
+    margin-top: auto;             /* pushes the sheet to the bottom */
+    background: var(--paper);
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+    box-shadow: var(--shadow-sheet);
+}
+
+.sheet-inner {
+    padding: 20px var(--gutter) 24px;
+}
+
+.auth--form .sheet-inner {
+    padding-top: 28px;
+}
+
+/* the form sheet must start below the island's top half */
+.auth--form .content {
+    padding-top: 34vh;
+}
+
+/* =========================================================
+   iPad (768px+): split screen
+   ========================================================= */
+@media (min-width: 768px) {
+    .auth {
+        height: 100vh;
+        min-height: 640px;
+    }
+
+    .content {
+        min-height: 0;
+        height: 100%;
+    }
+
+    .header {
+        top: 28px;
+        left: 6vw;
+        right: 5vw;
+    }
+
+    .auth--landing .header {
         display: flex;
-        flex-direction: column;
-        background: #fbf4e4;
-        color: #2a2017;
-        font-family: 'Nunito', system-ui, sans-serif;
     }
 
-    /* scene: sky gradient box that holds the sun, hills and 3D map */
-    .scene {
-        flex: 1 0 auto;        /* take whatever height the card doesn't use */
-        min-height: 44vh;
-        background: linear-gradient(180deg, #f6e6c4 0%, #f8ecd3 55%, #fbf4e4 100%);
+    /* ---------- landing: text left, island right ---------- */
+    /* The text column is 48% wide, but never narrower than its 6vw left margin + 520px: the
+       "Start exploring" + "I already have an account" row needs ~500px and must never wrap.
+       The island's box starts just before the column ends (8% overlap), so where the column has to
+       grow (iPads), the box gets narrower and SplashScene zooms the island out to fit.
+       A taller box = a bigger island; right: -4% lets the board run slightly off the edge */
+    .auth--landing {
+        --text-column: max(48%, calc(6vw + 520px));
     }
 
-    /* sun: a round span, the dashed ring is its ::after */
-    .sun {
-        top: 16%;
-        right: 12%;
-        width: 52px;
-        height: 52px;
-        background: #f3c54b;
+    .auth--landing .island {
+        top: 6%;
+        left: calc(var(--text-column) - 8%);
+        right: -4%;
+        height: 94%;
     }
 
-    .sun::after {
-        content: '';
-        position: absolute;
-        inset: -12px;
-        border: 3px dashed #f3c54b;
-        border-radius: 50%;
+    .auth--landing .sun {
+        display: block;
     }
 
-    /* hills: the SVG pinned to the bottom of the scene */
-    .hills {
-        height: 26%;
+    /* text is centred vertically. padding-bottom: 10px nudges the centre up by 5px */
+    .auth--landing .content {
+        justify-content: center;
+        width: var(--text-column);
+        padding-bottom: 10px;
+        padding-left: 6vw;
     }
 
-    /* 3D wrapper: fills the scene on phones; desktop pulls the right edge in */
-    .canvas-layer {
-        right: 0;
+    .auth--landing .hero {
+        padding: 0;
+        text-align: left;
     }
 
-    /* card: negative top margin pulls it up over the hills */
-    .card-panel {
-        margin-top: -56px;
-        margin-bottom: 16px;
-        border: 2px solid #e3d6b8;
-        background: #fffbf2;
-        box-shadow: 0 16px 32px -20px rgba(74, 52, 30, 0.4);
+    /* on big screens the landing buttons sit on the sky, no paper sheet */
+    .auth--landing .sheet {
+        margin-top: 0;
+        background: none;
+        box-shadow: none;
     }
 
-    /* title */
-    .title {
-        font-family: 'Fraunces', Georgia, serif;
-        font-size: clamp(2.25rem, 10vw, 3rem);
-        font-weight: 700;
+    .auth--landing .sheet-inner {
+        padding: 34px 0 0;
     }
 
-
-    /* =========================================================
-    sm (576px+): bigger phones. Still stacked, slightly roomier.
-    ========================================================= */
-    @media (min-width: 576px) {
-        .scene {
-            min-height: 48vh;
-        }
-
-        .sun {
-            width: 60px;
-            height: 60px;
-        }
-
-        .card-panel {
-            max-width: 520px;
-            margin-left: auto;
-            margin-right: auto;
-        }
+    /* ---------- form: island left, sheet right ---------- */
+    .auth--form .header {
+        top: 28px;
+        left: 32px;
     }
 
-    /* =========================================================
-    md (768px+): glass layout. Scene fills the page, card floats right.
-    ========================================================= */
-    @media (min-width: 768px) {
-        .landing {
-            position: relative;
-            display: flex;
-            flex-direction: row;
-            align-items: center;
-            justify-content: flex-end;
-            height: 100vh;
-            padding: 96px 4vw 40px;
-            overflow: hidden;
-        }
-
-        /* !important: overrides Bootstrap's position-relative on this div */
-        .scene {
-            position: absolute !important;
-            inset: 0;
-            height: auto;
-            min-height: 0;
-        }
-
-        /* pull the 3D in from the right so the map sits beside the card */
-        .canvas-layer {
-            right: 22%;
-        }
-
-        .sun {
-            right: auto;
-            left: 8%;
-            width: 68px;
-            height: 68px;
-        }
-
-        /* !important: overrides Bootstrap's mx-3 on the card */
-        .card-panel {
-            width: min(500px, 48%);
-            max-width: none;
-            margin: 0 !important;
-        }
+    /* full height, and right edge slides ~60px under the sheet (the sheet is drawn on top) */
+    .auth--form .island {
+        top: 0;
+        left: -4%;
+        right: 45%;
+        height: 100%;
     }
 
-    /* =========================================================
-    lg (992px+): laptops. More breathing room.
-    ========================================================= */
-    @media (min-width: 992px) {
-        .landing {
-            padding: 96px 5vw 40px;
-        }
-
-        .canvas-layer {
-            right: 24%;
-        }
-
-        .card-panel {
-            width: 500px;
-        }
+    .auth--form .content {
+        align-items: flex-end;
+        padding-top: 0;
     }
 
-    /* =========================================================
-    xl (1200px+): large screens.
-    ========================================================= */
-    @media (min-width: 1200px) {
-        .landing {
-            padding: 96px 6vw 40px;
-        }
-
-        .card-panel {
-            width: 540px;
-        }
-
-        .title {
-            font-size: 3.5rem;
-        }
+    .auth--form .sheet {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 50%;
+        height: 100%;
+        margin-top: 0;
+        border-radius: 40px 0 0 40px;
+        box-shadow: -20px 0 50px rgba(22, 20, 18, 0.10);
+        overflow-y: auto;
     }
+
+    .auth--form .sheet-inner {
+        width: min(440px, 100%);
+        padding: 32px;
+    }
+}
+
+/* =========================================================
+   Laptop (1200px+)
+   ========================================================= */
+@media (min-width: 1200px) {
+    .back-logo {
+        display: inline-flex;
+    }
+
+    /* landing: a taller box than on iPad = a bigger island. It runs past the top, bottom and right
+       edges a little; the text column still sits in front of it */
+    .auth--landing .island {
+        top: -6%;
+        left: calc(var(--text-column) - 10%);
+        right: -10%;
+        height: 116%;
+    }
+
+    /* the form panel is 560px with a 480px form inside, so there's ~40px either side
+       (it was 620px with a 440px form + 32px padding, which left ~120px of empty margin).
+       The island's box ends 60px under the panel, which is drawn on top */
+    .auth--form .island {
+        right: 500px;
+    }
+
+    .auth--form .sheet {
+        width: 560px;
+    }
+
+    .auth--form .sheet-inner {
+        width: min(480px, 100%);
+        padding: 32px 0;
+    }
+}
 </style>

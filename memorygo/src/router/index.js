@@ -105,9 +105,9 @@ router.beforeEach((to) => {
     return '/login'
   }
 
-  // Already logged in: skip the landing & login page (goes straight to menu dashboard)
+  // Already logged in: skip the landing & login page (goes straight to the map)
   if ((to.path === '/login' || to.path === '/' || to.path === '/signup') && auth.isLoggedIn) {
-    return '/menu'
+    return '/map'
   }
 
 })

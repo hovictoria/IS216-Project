@@ -1,0 +1,31 @@
+/* ----------------------------------------------------------------------------------------------------------
+PSEUDOCODE
+filename:   styles/base.css
+purpose:    - page-wide defaults that every screen shares (font, colours, focus ring)
+            - imported AFTER Bootstrap in main.js, so these rules win over Bootstrap's
+imports:    uses the variables from tokens.css
+---------------------------------------------------------------------------------------------------------- */
+
+body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+}
+
+/* A clear ring for keyboard users. Mouse clicks don't show it (that's what :focus-visible does) */
+:focus-visible {
+    outline: 3px solid var(--user-blue);
+    outline-offset: 3px;
+}
+
+/* Turn off animations for people who asked their device for less motion */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}
