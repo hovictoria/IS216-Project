@@ -54,6 +54,6 @@ app.use((err, req, res, next) => {
     res.status(500).json({ message: 'Something went wrong.' })
 })
 
-app.listen(PORT, '127.0.0.1', () => {
-    console.log(`Memory Go API running at http://127.0.0.1:${PORT}/api`)
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Memory Go API running on port ${PORT}`)
 })
