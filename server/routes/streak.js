@@ -10,13 +10,14 @@ const emptyWeek = () => [false, false, false, false, false, false, false]
 const clamp = (n, min, max) => Math.min(Math.max(n, min), max)
 
 // Reward range. Finishing always earns the minimum, a perfect result earns the maximum.
-const XP = { min: 10, max: 30 }
-const COINS = { min: 5, max: 15 }
-const rewardFor = (range, fraction) =>
+// Exported (with GAMES, rewardFor, singaporeToday) so routes/visits.js pays out the same way
+export const XP = { min: 10, max: 30 }
+export const COINS = { min: 5, max: 15 }
+export const rewardFor = (range, fraction) =>
     Math.round(range.min + fraction * (range.max - range.min))
 
 // How well they did, from 0 to 1, for each game
-const GAMES = {
+export const GAMES = {
     // 6 pairs: 6 moves is perfect, more moves earns less
     'memory': ({ moves }) => 6 / clamp(Number(moves) || 30, 6, 30),
 
@@ -33,7 +34,7 @@ const GAMES = {
 // ---------- Date helpers (all dates are 'YYYY-MM-DD' strings) ----------
 
 // Today's date in Singapore
-function singaporeToday() {
+export function singaporeToday() {
     return new Date().toLocaleDateString('en-CA', { timeZone: TIME_ZONE })
 }
 

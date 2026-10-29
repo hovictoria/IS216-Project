@@ -103,6 +103,16 @@ Phase 3: back end (places, search, routes)
         - nothing within 2 km: "No places within 2 km of you…"
         - HTML markers and 3D models are only created for places in range, and removed when they leave
         Tested with 324 places: near SMU 20 cards / 159 pins, zoomed out 0 pins + note, far west 0 cards + message
+  - [x] Location status (`views/map.vue`, `locationStatus`): the SMU fallback is no longer silent. A note says
+        "Finding your location…", "Still finding you", "Location is off", "Location needs https" (e.g. iPad over
+        http://192.168…) or "Outside Singapore". The blue dot only appears once a real location arrives.
+        Step 6: tap-in only allowed when `locationStatus` is 'ok'. Typical first fix: phone 1-5 s outdoors,
+        laptop 1-3 s (Wi-Fi), indoors / underground can take much longer
+  - [x] Map limited to Singapore (`views/map.vue`): `maxBounds` = a box from past Tuas / below Sentosa to past
+        Changi / above Woodlands (`SINGAPORE_BOUNDS`), `minZoom: 10` (about the whole island). Users can't pan or
+        zoom out of Singapore. The box is a rectangle, so a strip of Johor Bahru shows along the top edge.
+        If the browser says the user is outside that box (e.g. KL), the map stays on the city centre with
+        "You're outside Singapore. Showing the city centre"
   - [x] MRT cards take their line's colour (`PlaceCard.vue`, `lineBackground`): a soft tint (40% line colour mixed
         into the paper colour) so black text stays readable; interchanges blend their lines diagonally
         (City Hall green → red). Phone cards are see-through (70%), sidebar cards solid. Collected / undiscovered
@@ -123,10 +133,63 @@ Phase 3: back end (places, search, routes)
   Keep `places-seed.sql`: SMU Connexion, Spice Garden, Fort Canning Park and Capitol Theatre exist only there,
   and it gives ids 1-17 (ids 1-6 = the old stations that `user_spirits.station_id` points at).
   Don't clear the table before importing: the script merges into our rows by matching them.
-- [ ] Step 6: `visits` table (playable / collected / undiscovered per user)
-- [ ] Step 7: OneMap account + `/api/search`
+- [ ] Step 6: `visits` + tap-in rewards. Decided: MRT pays the same as spots (5-15 coins, 10-30 XP, score-based)
+  - [x] 6c prep: `/api/places` and `PlaceCard.vue` no longer use `reward_coins`; cards say "Up to 15 coins" /
+        "Check in · up to 15" / "Replay · up to 15"
+  - [x] 6c: `docs/visits.sql` (run in Supabase): drops `places.reward_coins`, creates `visits` (one paid visit per
+        user + place + Singapore day via a partial unique index; stores distance only, not coordinates), and the
+        `finish_visit()` payout function (finish + pay + add to progress in one step; execute revoked from
+        browsers, only the server's service role can call it)
+  - [x] 6d: `server/routes/visits.js`, mounted at `/api/visits` in `server.js`
+        - POST /start { placeId, lat, lng }: inside the zone? nearest zone you're in? → paid or replay
+          (replay if already paid here today, or last paid visit < 5 min ago); resumes an unfinished paid visit
+          from the last 30 min; saves distance only. Replies { visitId, game, paid, reason, waitMinutes }
+        - POST /:id/finish { moves | score | level }: scores it with the existing formula (`GAMES`, `rewardFor`
+          now exported from `streak.js`), pays through `finish_visit()`, updates the streak if paid.
+          Replies { paid, earned: { coins, xp }, totals }
+        - checked: both answer "Not signed in." without a login. Full test comes with the map + Memory match
+  - [x] 6e: `/api/places` adds `visited` (finished a game there ever → green pin, for good) and `playedToday`
+        (paid there today → "Played today · back tomorrow") for the signed-in user
+  - [x] 6f: map (`views/map.vue`): "Tap in at <place> · Earn up to 15" button at the top of the sheet when your
+        REAL location is inside a zone (nearest zone wins); calls POST /api/visits/start, then opens
+        `/games/<game>?visit=<id>`. If the server says no, its message shows under the button.
+        Cards: green "Been here" tag (was "Spirit collected": Spirits don't drop from visits yet)
+  - [x] 6g + 6h: all 6 games at once: `lib/gamereward.js` sends the result to POST /api/visits/<id>/finish when
+        the address has ?visit=, otherwise the old /api/progress/xp (games menu; retire later)
+        Tested with a fake location next to Tan Tock Seng Hospital: button shows, tap in opens Memory match
+  - [x] Games are RANDOM per visit (decided: a place you pass every day shouldn't always give the same game).
+        The server picks one of the 6 at tap-in, never the same as your last visit to that place, and saves it
+        on the visit (`visits.game`, added by `docs/visits-random-game.sql`) so the result is scored for the game
+        actually played. Cards say "Surprise game". `places.game_type` is no longer used
+  - [x] Fix: "Play for fun" showed after tapping in WITHOUT finishing. Now `playedToday` = FINISHED a paid game
+        today; a new `inProgress` (tapped in < 30 min ago, not finished) shows "Continue · up to 15" and tapping
+        in resumes the same paid game. An abandoned paid visit older than 30 min is released (paid → false) at
+        the next tap-in, so it doesn't cost the day's reward
+  - [ ] Later: retire /api/progress/xp + /api/spirits/collect, drop Spirits from paid visits, "back to map"
+        after a tap-in game
+- [x] Step 7: OneMap account + search with a dropdown + microphone
+  - `server/lib/onemap.js`: logs in with ONEMAP_EMAIL / ONEMAP_PASSWORD, keeps the token in memory, renews it
+    an hour before it expires (or when OneMap rejects it). `searchOneMap(text)` → { name, address, postal, lat, lng }
+  - `server/routes/search.js`: GET /api/search?q= (signed-in, 2-60 characters, max 8, duplicates removed,
+    answers cached 10 min)
+  - `memorygo/src/components/map/PlaceSearch.vue`: results as you type. MemoryGo places first (instant, in the
+    browser), then OneMap places (0.3 s after you stop typing). Each shows distance (only with a real location)
+    and "N games nearby" (MemoryGo places within 300 m). Recent (last 5 picks, this browser only). Arrow keys /
+    Enter / Escape. variant="dropdown" in the iPad/laptop sidebar; variant="screen" = full-screen search on phones
+    with a big "Say where you're going" button
+  - `memorygo/src/lib/useSpeech.js`: microphone with the browser's Web Speech API (en-SG). Chrome / Edge / Safari;
+    hidden on Firefox. The browser turns speech into text; MemoryGo stores nothing
+  - `SearchBar.vue` (phone top bar) is now a button: opens the full-screen search; its mic opens it listening
+  - Picking: a MemoryGo place is selected like its card; any other address gets a black pin + label and the map flies there
+  - Gotcha: don't name a class `row` (Bootstrap's grid). Results use `.result`
+  - Fix: with many results the rows overlapped (the flex column squashed them to fit its max height).
+    `.panel > * { flex-shrink: 0 }` keeps every row full height, so the panel scrolls instead
 - [ ] Step 8: `/api/route` + "on the way" filter (Turf `pointToLineDistance`)
 - [ ] Step 9: live journey + tap in
+
+Pin colours (decided for step 6): green = "you've been here", and it STAYS green (the map fills up with green
+as you explore). Whether a place pays today is shown on the card instead: "Up to 15 coins" (never played),
+"Replay · up to 15 coins" (played before, not today), "Played today · back tomorrow".
 
 Rewards (decided): no daily re-roll. Coins and XP keep today's score-based formula (better score = more),
 paid only at a real place, once per place per day. Chests are left for later; until then places are red / blue / green only.
@@ -203,10 +266,13 @@ IS216-Project/
 ├── docs/
 │   ├── places.sql                 creates the `places` table (run once in the Supabase SQL Editor)
 │   ├── places-seed.sql            the 17 starting places (run once, after places.sql)
-│   └── places-import.sql          adds source / source_id / url for the data.gov.sg import
+│   ├── places-import.sql          adds source / source_id / url for the data.gov.sg import
+│   ├── visits.sql                 visits table + finish_visit() payout function, drops reward_coins
+│   └── visits-random-game.sql     adds visits.game (the random game picked at tap-in)
 └── server/
     ├── server.js                  + app.use('/api/places', placesRoutes)
     ├── routes/places.js           GET /api/places → { places: [...] } (signed-in only)
+    ├── routes/visits.js           POST /api/visits/start (tap in), POST /api/visits/:id/finish (pay out)
     └── scripts/import-places.js   run by hand: data.gov.sg → places table (--dry-run only prints)
 ```
 
@@ -404,7 +470,7 @@ You pick one     → GET /api/route?to=…&mode=…   → Express → OneMap rou
 | Map tiles | none | OpenFreeMap needs no key |
 | Supabase server key | `server/.env` | Bypasses RLS. Never sent to the browser |
 | Supabase publishable key | `memorygo/.env.local` | Safe in the browser; RLS protects the tables |
-| OneMap login / token (later) | `server/.env` | Never sent to the browser |
+| OneMap login (`ONEMAP_EMAIL`, `ONEMAP_PASSWORD`) | `server/.env` (placeholders in `.env.example`) | Set up and checked: OneMap gives a token (lasts ~3 days). Express will swap the login for a token and renew it itself; the token is never saved or sent to the browser. A password with `#` must be in "quotes" (unquoted `#` starts a comment in .env) |
 
 ### Tidy-up files in `memorygo/` (keep them)
 

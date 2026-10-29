@@ -13,7 +13,7 @@ emits:      select -> the parent centres the map on this place
 
 <script setup>
 import { computed } from 'vue'
-import { GAME_LABELS, MRT_COLOURS } from '@/data/placeLabels'
+import { MRT_COLOURS } from '@/data/placeLabels'
 import { distanceLabel } from '@/lib/geo'
 import CoinIcon from '@/components/ui/CoinIcon.vue'
 
@@ -35,20 +35,23 @@ const tone = computed(() => {
     return isMrt.value ? 'tone-butter' : 'tone-peach'
 })
 
-// the reward chip at the top-right
+// the reward chip at the top-right. Coins depend on how well you play (5-15, see COINS in
+// server/routes/streak.js), so the card shows the most you can earn, not a fixed amount
+const MAX_COINS = 15
 const rewardLabel = computed(() => {
-    const { state, rewardCoins } = props.place
-    if (state === 'collected') return `Replay +${rewardCoins}`
-    if (isMrt.value) return `Check in +${rewardCoins}`
-    return `+${rewardCoins} coins`
+    if (props.place.inProgress) return `Continue · up to ${MAX_COINS}`     // tapped in, not finished yet
+    if (props.place.playedToday) return 'Played today · back tomorrow'
+    if (props.place.state === 'collected') return `Replay · up to ${MAX_COINS}`
+    if (isMrt.value) return `Check in · up to ${MAX_COINS}`
+    return `Up to ${MAX_COINS} coins`
 })
 
 // the outlined tag above the title
 const tagLabel = computed(() => {
-    if (props.place.state === 'collected') return 'Spirit collected'
+    if (props.place.state === 'collected') return 'Been here'       // "Spirit collected" once Spirits drop from visits
     if (props.place.state === 'undiscovered') return 'Undiscovered'
     if (isMrt.value) return 'MRT station'
-    return GAME_LABELS[props.place.gameType]
+    return 'Surprise game'          // the game is picked at random when you tap in (server/routes/visits.js)
 })
 
 // the big faint text behind the title: year built, station code, or "?"

@@ -15,6 +15,7 @@ imports:    MapLibre, lib/paperMapStyle.js (colours), lib/mapPins3d.js (3D pins)
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 
@@ -27,6 +28,7 @@ import { api } from '@/lib/api'
 import BottomSheet from '@/components/map/BottomSheet.vue'
 import PlaceCard from '@/components/map/PlaceCard.vue'
 import SearchBar from '@/components/map/SearchBar.vue'
+import PlaceSearch from '@/components/map/PlaceSearch.vue'
 import AppNav from '@/components/ui/AppNav.vue'
 import CoinPill from '@/components/ui/CoinPill.vue'
 import HandUnderline from '@/components/ui/HandUnderline.vue'
@@ -34,6 +36,19 @@ import appLogo from '@/assets/app-logo.png'
 
 // Used until the browser gives us a real location (or if location is turned off)
 const SMU = [103.8502, 1.2963]
+
+// The map can't be panned or zoomed out past Singapore (MapLibre's maxBounds + minZoom).
+// A little sea is left around the island so coastal places (Changi, Tuas, Sentosa) aren't jammed
+// against the screen edge or hidden behind the sheet / sidebar
+const SINGAPORE_BOUNDS = [
+    [103.55, 1.13],                          // south-west corner (lng, lat): past Tuas, below Sentosa
+    [104.13, 1.50],                          // north-east corner: past Changi, above Woodlands
+]
+const MIN_ZOOM = 10                          // about "the whole island"
+
+const inSingapore = ([lng, lat]) =>
+    lng >= SINGAPORE_BOUNDS[0][0] && lng <= SINGAPORE_BOUNDS[1][0]
+    && lat >= SINGAPORE_BOUNDS[0][1] && lat <= SINGAPORE_BOUNDS[1][1]
 
 // ---------- Screen size ----------
 // The sheet is a sidebar from 768px up, so the card layout and map padding change with it
@@ -236,6 +251,44 @@ function selectPlace(place) {
     map.easeTo({ center: [place.lng, place.lat], padding: mapPadding(), duration: 600 })
 }
 
+// ---------- Search (components/map/PlaceSearch.vue) ----------
+// Phones: the top bar opens a full-screen search (its mic opens it already listening).
+// iPad / laptop: the search in the sidebar shows a dropdown as you type.
+const searchOpen = ref(false)
+const searchListen = ref(false)
+let searchMarker = null                     // the black pin dropped on an address picked from search
+
+function openSearch(listen) {
+    searchListen.value = listen
+    searchOpen.value = true
+}
+
+// a result was picked: a MemoryGo place is selected like tapping its card; any other address
+// gets a pin and the map flies there (its nearby MemoryGo pins then show around it)
+function onSearchPick(result) {
+    searchOpen.value = false
+    searchMarker?.remove()
+    searchMarker = null
+
+    if (result.kind === 'place') {
+        selectPlace(result.place)
+        return
+    }
+
+    const el = document.createElement('div')
+    el.className = 'search-pin'
+    const label = document.createElement('span')
+    label.className = 'search-pin-label'
+    label.textContent = result.name
+    const dot = document.createElement('span')
+    dot.className = 'search-pin-dot'
+    el.append(label, dot)
+    searchMarker = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([result.lng, result.lat]).addTo(map)
+
+    selectedId.value = null
+    map.flyTo({ center: [result.lng, result.lat], zoom: Math.max(map.getZoom(), 16), padding: mapPadding(), duration: 1200 })
+}
+
 // First view: the user at street level, in the part of the map the sheet/sidebar doesn't cover
 // (that's what the padding does). Phones zoom out a little more because only a short strip of map
 // shows above the sheet. (With places all over Singapore, "fit every place" would show the whole island)
@@ -250,17 +303,102 @@ function centreOnMe() {
     map.easeTo({ center: userPos.value, padding: mapPadding(), duration: 600 })
 }
 
-let hasFix = false                           // true once the browser has told us where the user is
+// ---------- Where the user is ----------
+// Until the browser gives a real location, the map shows places around SMU. That fallback used to be
+// silent, so it looked like the app thought you were at Bras Basah. Now the page always says which it is:
+//   'waiting'  asking the browser (first answer usually takes 1-5 s on a phone)
+//   'ok'       real location, blue dot shown
+//   'slow'     no answer yet after 15 s (indoors / underground); still trying
+//   'off'      the user (or the Mac's settings) blocked location
+//   'insecure' the page isn't https or localhost, so the browser never gives a location
+//              (e.g. testing on an iPad through http://192.168.x.x)
+//   'outside'  the location is outside Singapore
+// Step 6: tapping in will only be allowed when this is 'ok'
+const locationStatus = ref('waiting')
+let hasFix = false                           // true once a real location inside Singapore has arrived
+
+// short on purpose: on a phone the note sits over the map, under the search bar
+const LOCATION_NOTES = {
+    waiting: 'Finding your location…',
+    slow: 'Still finding you · showing SMU area',
+    off: 'Location is off · showing SMU area',
+    insecure: 'Location needs https · showing SMU area',
+    outside: 'Outside Singapore · showing city centre',
+}
 
 function onLocation(position) {
-    userPos.value = [position.coords.longitude, position.coords.latitude]
-    userMarker.setLngLat(userPos.value)
+    const here = [position.coords.longitude, position.coords.latitude]
 
-    // The first real location replaces SMU, so jump there once (later updates don't move the map)
+    // Outside Singapore (e.g. on holiday): the map can't go there, so stay on the city centre
+    // and say why, instead of measuring distances to places hundreds of km away
+    if (!inSingapore(here)) {
+        locationStatus.value = 'outside'
+        return
+    }
+
+    locationStatus.value = 'ok'
+    userPos.value = here
+    userMarker.setLngLat(here)
+
+    // The first real location replaces SMU: show the blue dot and jump there once
+    // (later updates move the dot, not the map)
     if (!hasFix) {
         hasFix = true
+        userMarker.addTo(map)
         showNearby()
         selectNearest()
+    }
+}
+
+// error.code: 1 = blocked, 2 = the device can't work it out, 3 = took longer than the timeout.
+// watchPosition keeps trying after 2 and 3, so those only change the note
+function onLocationError(error) {
+    if (error.code === 1) locationStatus.value = 'off'
+    else if (!hasFix) locationStatus.value = 'slow'
+}
+
+// ---------- Tapping in (step 6) ----------
+// The button appears when the user's REAL location is inside a place's zone. If they're inside
+// several zones, it's the nearest one (the server checks the same rules again; this only decides
+// what the button says)
+const router = useRouter()
+const tapInState = ref('idle')               // 'idle' | 'starting'
+const tapInMessage = ref('')                 // the server's reason if it said no
+
+const tapInPlace = computed(() => {
+    if (locationStatus.value !== 'ok') return null
+    return places.value
+        .map((place) => ({ place, distance: distanceM(userPos.value, [place.lng, place.lat]) }))
+        .filter(({ place, distance }) => distance <= place.radiusM)
+        .sort((a, b) => a.distance - b.distance)[0]?.place ?? null
+})
+
+// the small label on the right of the button
+//   inProgress: tapped in but didn't finish (last 30 min) → tapping in again resumes the same paid game
+//   playedToday: finished a paid game here today → a replay earns nothing
+const tapInHint = computed(() => {
+    if (tapInPlace.value?.inProgress) return 'Continue · up to 15'
+    if (tapInPlace.value?.playedToday) return 'Play for fun'
+    return 'Earn up to 15'
+})
+
+// a different place (or none) → clear the old message
+watch(tapInPlace, () => { tapInMessage.value = '' })
+
+async function tapIn() {
+    const place = tapInPlace.value
+    if (!place || tapInState.value === 'starting') return
+    tapInState.value = 'starting'
+    tapInMessage.value = ''
+    try {
+        const [lng, lat] = userPos.value
+        const { data } = await api.post('/visits/start', { placeId: place.id, lat, lng })
+        // the game reads ?visit= and sends its result to /api/visits/:id/finish (lib/gamereward.js)
+        router.push({ path: `/games/${data.game}`, query: { visit: data.visitId, paid: data.paid ? '1' : '0' } })
+    } catch (error) {
+        tapInMessage.value = error.response?.data?.message ?? 'Could not tap in. Please try again.'
+    } finally {
+        tapInState.value = 'idle'
     }
 }
 
@@ -276,8 +414,10 @@ async function loadPlaces() {
         const { data } = await api.get('/places')
         if (!map) return                     // they left the page while we were waiting
 
-        // Everything is playable until the `visits` table can say what this user has played (step 6)
-        places.value = data.places.map((place) => ({ ...place, state: 'playable' }))
+        // The server says which places THIS user has played (visits table):
+        // ever played → 'collected' (green pin, sage card, for good); otherwise 'playable'.
+        // place.playedToday decides the card label ("Played today · back tomorrow")
+        places.value = data.places.map((place) => ({ ...place, state: place.visited ? 'collected' : 'playable' }))
         placesStatus.value = 'ready'
         selectNearest()
     } catch (error) {
@@ -296,6 +436,8 @@ onMounted(() => {
         zoom: 16.2,
         pitch: 45,
         bearing: -20,
+        maxBounds: SINGAPORE_BOUNDS,         // can't pan outside Singapore
+        minZoom: MIN_ZOOM,                   // can't zoom out past the whole island
         antialias: true,                     // smooth edges on the 3D pins
         attributionControl: { compact: true },
     })
@@ -326,16 +468,21 @@ onMounted(() => {
     // Places come from the server; their markers are added once they arrive
     loadPlaces()
 
-    // The user: blue dot with a white ring and a soft halo
+    // The user: blue dot with a white ring and a soft halo. It's only put on the map once a real
+    // location arrives (onLocation), so it never sits at SMU pretending to be them
     const dot = document.createElement('span')
     dot.className = 'user-dot'
-    userMarker = new maplibregl.Marker({ element: dot }).setLngLat(userPos.value).addTo(map)
+    userMarker = new maplibregl.Marker({ element: dot }).setLngLat(userPos.value)
 
-    // Follow the real location. If it's off, we quietly stay at SMU
-    watchId = navigator.geolocation?.watchPosition(onLocation, () => {}, {
-        enableHighAccuracy: true,
-        timeout: 15000,
-    })
+    // Follow the real location. Browsers only give it on https pages or localhost
+    if (!window.isSecureContext || !navigator.geolocation) {
+        locationStatus.value = 'insecure'
+    } else {
+        watchId = navigator.geolocation.watchPosition(onLocation, onLocationError, {
+            enableHighAccuracy: true,
+            timeout: 15000,
+        })
+    }
 
     // Coins live in the `progress` table, behind our Express server
     api.get('/progress')
@@ -370,12 +517,17 @@ watch([detent, isWide], () => map?.easeTo({ padding: mapPadding(), duration: 340
 
         <!-- phone only: search + coins along the top -->
         <div class="topbar">
-            <SearchBar class="topbar-search" />
+            <SearchBar class="topbar-search" @open="openSearch(false)" @mic="openSearch(true)" />
             <CoinPill :coins="coins" />
         </div>
 
         <!-- zoomed out too far for pins (they would pile up over the whole island) -->
-        <p v-if="placesStatus === 'ready' && mapZoom < MIN_PIN_ZOOM" class="zoom-note" role="status">
+        <!-- location problems first (they explain why the map isn't showing where you are) -->
+        <p v-if="locationStatus !== 'ok'" class="zoom-note" :class="{ 'note-wrap': locationStatus !== 'waiting' }"
+            role="status">
+            {{ LOCATION_NOTES[locationStatus] }}
+        </p>
+        <p v-else-if="placesStatus === 'ready' && mapZoom < MIN_PIN_ZOOM" class="zoom-note" role="status">
             Zoom in to see places
         </p>
 
@@ -397,7 +549,20 @@ watch([detent, isWide], () => map?.easeTo({ padding: mapPadding(), duration: 340
                 <!-- iPad/laptop only: logo + search live inside the sidebar -->
                 <div class="sidebar-top">
                     <span class="sidebar-brand"><img :src="appLogo" alt="" class="brand-mark" />MemoryGo</span>
-                    <SearchBar />
+                    <PlaceSearch variant="dropdown" :places="places" :user-pos="userPos"
+                        :knows-location="locationStatus === 'ok'" @pick="onSearchPick" />
+                </div>
+
+                <!-- inside a place's zone: tap in to play its game -->
+                <div v-if="tapInPlace" class="tap-in">
+                    <button type="button" class="tap-in-btn" :disabled="tapInState === 'starting'" @click="tapIn">
+                        <span class="tap-in-dot"></span>
+                        <span class="tap-in-text">
+                            {{ tapInState === 'starting' ? 'Tapping in…' : `Tap in at ${tapInPlace.name}` }}
+                        </span>
+                        <span class="tap-in-hint">{{ tapInHint }}</span>
+                    </button>
+                    <p v-if="tapInMessage" class="tap-in-message" role="alert">{{ tapInMessage }}</p>
                 </div>
 
                 <div class="near-row">
@@ -431,6 +596,13 @@ watch([detent, isWide], () => map?.easeTo({ padding: mapPadding(), duration: 340
         </BottomSheet>
 
         <AppNav :coins="coins" />
+
+        <!-- phones: full-screen search (covers the map, nav and sheet until a place is picked) -->
+        <div v-if="searchOpen && !isWide" class="search-screen" role="dialog" aria-label="Search for a place">
+            <PlaceSearch variant="screen" :places="places" :user-pos="userPos"
+                :knows-location="locationStatus === 'ok'" :listen-on-open="searchListen"
+                @pick="onSearchPick" @close="searchOpen = false" />
+        </div>
     </div>
 </template>
 
@@ -588,6 +760,46 @@ watch([detent, isWide], () => map?.easeTo({ padding: mapPadding(), duration: 340
     flex: 1;
 }
 
+/* phones: full-screen search over everything */
+.search-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    padding: 16px 16px 24px;
+    background: var(--paper);
+    box-sizing: border-box;
+}
+
+/* the pin for an address picked from search (not a MemoryGo place) */
+.map :deep(.search-pin) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;
+}
+
+.map :deep(.search-pin-label) {
+    margin-bottom: 6px;
+    padding: 7px 13px;
+    border-radius: var(--radius-pill);
+    background: var(--white);
+    box-shadow: 0 6px 16px rgba(22, 20, 18, 0.18);
+    color: var(--ink);
+    font-family: var(--font);
+    font-size: 15px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.map :deep(.search-pin-dot) {
+    width: 22px;
+    height: 22px;
+    border: 4px solid var(--white);
+    border-radius: 50%;
+    background: var(--ink);
+    box-shadow: 0 4px 10px rgba(22, 20, 18, 0.3);
+}
+
 /* "Zoom in to see places": under the search bar on phones, bottom-middle of the map on big screens */
 .zoom-note {
     position: absolute;
@@ -609,7 +821,20 @@ watch([detent, isWide], () => map?.easeTo({ padding: mapPadding(), duration: 340
     pointer-events: none;
 }
 
+/* the longer location messages may need two lines on a phone (and must clear the locate button) */
+.zoom-note.note-wrap {
+    width: max-content;
+    max-width: calc(100% - 128px);
+    border-radius: 20px;
+    text-align: center;
+    white-space: normal;
+}
+
 @media (min-width: 768px) {
+    .zoom-note.note-wrap {
+        max-width: 420px;
+    }
+
     .zoom-note {
         top: auto;
         bottom: 28px;
@@ -670,6 +895,66 @@ watch([detent, isWide], () => map?.easeTo({ padding: mapPadding(), duration: 340
    ========================================================= */
 .sidebar-top {
     display: none;
+}
+
+/* ---------- Tap in (inside a place's zone) ---------- */
+.tap-in {
+    margin-bottom: 14px;
+}
+
+.tap-in-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: var(--cta-height);
+    padding: 0 18px;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: var(--ink);
+    color: var(--white);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.tap-in-btn:disabled {
+    opacity: 0.7;
+    cursor: wait;
+}
+
+.tap-in-dot {
+    flex-shrink: 0;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--live-green);
+    box-shadow: 0 0 0 4px rgba(143, 209, 139, 0.3);
+}
+
+.tap-in-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 18px;
+    font-weight: 700;
+    white-space: nowrap;
+    text-overflow: ellipsis;          /* long names: "Tap in at Former Saint Jos…" */
+}
+
+.tap-in-hint {
+    flex-shrink: 0;
+    padding: 4px 10px;
+    border-radius: var(--radius-pill);
+    background: rgba(255, 255, 255, 0.16);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.tap-in-message {
+    margin: 8px 4px 0;
+    font-size: 16px;
+    font-weight: 600;
 }
 
 .near-row {
