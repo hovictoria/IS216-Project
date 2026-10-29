@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch,onBeforeUnmount, onMounted } from "vue";
+import { ref, computed, watch, onBeforeUnmount, onMounted } from "vue";
 import AppMenu from "@/components/menu.vue";
 import { useAuthStore } from "../stores/auth";
 import { useRouter } from "vue-router";
@@ -17,8 +17,6 @@ const username = auth.user.user_metadata.display_name;
 const now = new Date();
 
 const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-// Which days this week the person has played (Mon..Sun). Replace with real data.
-/* const played = ref([true, true, true, false, false, false, false]); */
 
 const game = { name: "Memory Match", minutes: 3 };
 
@@ -29,6 +27,16 @@ const walk = {
   ],
   total: "About 1.9 km · 30 min walk",
 };
+
+/* ---------- Server data ---------- */
+const streak = ref(0);
+const played = ref(Array(7).fill(false));   // Mon..Sun
+// daily spirit: true once the player has found a spirit today (shows check on step 3 of Today's plan)
+const spiritToday = ref(false);
+// true until the requests below have finished (shows placeholders instead of wrong numbers)
+const loading = ref(true);
+// true if the server is taking a while (e.g. waking up on a free host)
+const slow = ref(false);
 
 /* ---------- Derived values ---------- */
 const hour = now.getHours();
@@ -50,34 +58,45 @@ const streakMessage = computed(() =>
     ? "Play today to start your streak."
     : `You've played ${dayLabel(streak.value)} in a row. Play today to make it ${streak.value + 1}.`
 );
-const streak=ref(0);
-const played = ref([]);
 
-async function getstreak(){
-  try{
-        await api.post("/progress/init"); 
-        const {data}=await api.get('/progress/streak')
-        streak.value=data.streak;
-        played.value=data.week;
-      }catch(error){
-        console.log(error)
-      }
-}
-// daily spirit: true once the player has found a spirit today (shows check on step 3 of Today's plan)
-const spiritToday = ref(false);
+/* ---------- Load streak + spirit ---------- */
+async function loadData() {
+  // after 4 seconds, tell the person we're still working on it
+  const slowTimer = setTimeout(() => (slow.value = true), 4000);
 
-// load whether the player has found a spirit today
-// separate from the streak's onMounted, so if one fails the other still works
-onMounted(async () => {
   try {
-    const { data } = await api.get('/spirits/today')
-    spiritToday.value = data.foundToday
-    await api.post("/progress/init"); 
-    getstreak();
-  } catch (error) {
-    console.log(error)
+    // make sure the progress row exists (a failure here shouldn't block the rest)
+    try {
+      await api.post("/progress/init");
+    } catch (e) {
+      console.log("init failed", e);
+    }
+
+    // run both at once; each can fail without breaking the other
+    const [streakRes, spiritRes] = await Promise.allSettled([
+      api.get("/progress/streak"),
+      api.get("/spirits/today"),
+    ]);
+
+    if (streakRes.status === "fulfilled") {
+      streak.value = streakRes.value.data.streak ?? 0;
+      played.value = streakRes.value.data.week ?? Array(7).fill(false);
+    } else {
+      console.log("streak failed", streakRes.reason);
+    }
+
+    if (spiritRes.status === "fulfilled") {
+      spiritToday.value = !!spiritRes.value.data.foundToday;
+    } else {
+      console.log("spirit failed", spiritRes.reason);
+    }
+  } finally {
+    clearTimeout(slowTimer);
+    loading.value = false; // always runs, even if something above throws
   }
-})
+}
+
+onMounted(loadData);
 
 /* ---------- Read aloud ---------- */
 const readAloud = ref(true);
@@ -133,7 +152,7 @@ function startGame() {
 
 
     <!-- Main -->
-    <main class="main" ref="mainEl">
+    <main class="main" ref="mainEl" :aria-busy="loading">
       <!-- Hero banner -->
       <div class="hero">
         <img :src="heroImg" alt="" class="hero-img" />
@@ -175,16 +194,19 @@ function startGame() {
                 </li>
                 <!-- step 3: daily spirit bonus (number turns into a green ✓ once a spirit is found today) -->
                 <li class="step">
-                  <span class="step-num" :class="spiritToday ? 'done' : 'outlined'">
-                    <i v-if="spiritToday" class="fa-solid fa-check" aria-hidden="true"></i>
+                  <span class="step-num" :class="!loading && spiritToday ? 'done' : 'outlined'">
+                    <i v-if="!loading && spiritToday" class="fa-solid fa-check" aria-hidden="true"></i>
                     <template v-else>3</template>
                   </span>
                   <div>
                     <div class="step-title">
-                      {{ spiritToday ? "Today's spirit found!" : "Find today's spirit 🌟" }}
+                      {{ !loading && spiritToday ? "Today's spirit found!" : "Find today's spirit 🌟" }}
                     </div>
                     <div class="step-sub">
-                      {{ spiritToday ? "Come back tomorrow for another guaranteed spirit." : "Your first station today always gives you a spirit." }}
+                      <template v-if="loading">Checking…</template>
+                      <template v-else>
+                        {{ spiritToday ? "Come back tomorrow for another guaranteed spirit." : "Your first station today always gives you a spirit." }}
+                      </template>
                     </div>
                   </div>
                 </li>
@@ -198,7 +220,10 @@ function startGame() {
 
             <p class="streak-note mx-5 mx-sm-0">
               <i class="fa-solid fa-seedling" aria-hidden="true"></i>
-              <span>
+              <span v-if="loading" role="status">
+                {{ slow ? "Still getting your streak. This can take a moment…" : "Loading your streak…" }}
+              </span>
+              <span v-else>
                 {{ streak === 0 ? "Play today to start your streak." : `You've played ${dayLabel(streak)} in a row.` }}
               </span>
             </p>
@@ -212,15 +237,18 @@ function startGame() {
                 <li v-for="(d, i) in weekDays" :key="d" class="week-day">
                   <span
                     class="day-dot"
-                    :class="{ done: played[i], today: i === todayIdx && !played[i] }"
-                    :aria-label="played[i] ? `${d}: played` : i === todayIdx ? `${d}: today` : `${d}: not played`"
+                    :class="{
+                      done: !loading && played[i],
+                      today: !loading && i === todayIdx && !played[i],
+                    }"
+                    :aria-label="loading ? `${d}: loading` : played[i] ? `${d}: played` : i === todayIdx ? `${d}: today` : `${d}: not played`"
                   >
-                    <i v-if="played[i]" class="fa-solid fa-check" aria-hidden="true"></i>
+                    <i v-if="!loading && played[i]" class="fa-solid fa-check" aria-hidden="true"></i>
                   </span>
                   <span :class="{ 'fw-bold text-ink': i === todayIdx }">{{ i === todayIdx ? "Today" : d }}</span>
                 </li>
               </ul>
-              <p class="mb-0 mt-3">{{ streakMessage }}</p>
+              <p class="mb-0 mt-3">{{ loading ? "Loading…" : streakMessage }}</p>
             </section>
 
             <section class="card-soft" aria-labelledby="walk-title">
