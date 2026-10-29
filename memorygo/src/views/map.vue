@@ -15,11 +15,11 @@ imports:    MapLibre, lib/paperMapStyle.js (colours), lib/mapPins3d.js (3D pins)
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 
-import { MRT_COLOURS } from '@/data/placeLabels'
+import { MRT_COLOURS, lineColour } from '@/data/placeLabels'
 import { distanceM, circleRing } from '@/lib/geo'
 import { MAP_STYLE_URL, applyPaperStyle } from '@/lib/paperMapStyle'
 import { createPins3d, pinScale } from '@/lib/mapPins3d'
@@ -29,6 +29,10 @@ import BottomSheet from '@/components/map/BottomSheet.vue'
 import PlaceCard from '@/components/map/PlaceCard.vue'
 import SearchBar from '@/components/map/SearchBar.vue'
 import PlaceSearch from '@/components/map/PlaceSearch.vue'
+import RoutePanel from '@/components/map/RoutePanel.vue'
+import JourneyHud from '@/components/map/JourneyHud.vue'
+import { useJourneyStore } from '@/stores/journey'
+import { useJourney, useDemoWalk } from '@/lib/useJourney'
 import AppNav from '@/components/ui/AppNav.vue'
 import CoinPill from '@/components/ui/CoinPill.vue'
 import HandUnderline from '@/components/ui/HandUnderline.vue'
@@ -197,7 +201,7 @@ function createMarkerEl(place) {
         el.append(lines)
     }
 
-    el.addEventListener('click', () => selectPlace(place))
+    el.addEventListener('click', () => openPlace(place))
     return el
 }
 
@@ -241,6 +245,8 @@ function onMapMoved() {
 
 // Keep the user visible above the phone sheet / beside the sidebar
 function mapPadding() {
+    // live journey: no sheet / sidebar, just room for the cards at the top and bottom
+    if (journey.showing) return { top: 230, bottom: 230, left: 0, right: 0 }
     if (isWide.value) return { left: window.innerWidth >= 1200 ? 460 : 410, top: 0, right: 0, bottom: 0 }
     const covered = detent.value === 'down' ? 204 : Math.round(window.innerHeight * 0.54)
     return { left: 0, top: 130, right: 0, bottom: covered }   // top: room for the search bar + locate button
@@ -249,6 +255,84 @@ function mapPadding() {
 function selectPlace(place) {
     selectedId.value = place.id
     map.easeTo({ center: [place.lng, place.lat], padding: mapPadding(), duration: 600 })
+}
+
+// ---------- Place preview + directions (components/map/RoutePanel.vue) ----------
+// Tapping a card / pin, or picking from search, shows that place in the sheet / sidebar with
+// "Take me there". The route the panel chooses is drawn on the map with numbered stops
+const destination = ref(null)               // { name, sub, fact, url, lat, lng, placeId? } or null
+let routeStopMarkers = []                    // the numbered circles on the places on the way
+
+function openPlace(place) {
+    selectPlace(place)
+    destination.value = {
+        name: place.name,
+        sub: place.kind === 'mrt' ? `MRT station · ${place.lineCodes.join(' ')}` : place.category,
+        fact: place.fact,
+        url: place.url,
+        lat: place.lat,
+        lng: place.lng,
+        placeId: place.id,
+    }
+    if (!isWide.value && detent.value === 'down') detent.value = 'middle'
+}
+
+function closeDestination() {
+    destination.value = null
+    searchMarker?.remove()
+    searchMarker = null
+}
+
+// colour of each part of a route: MRT in its line colour, buses dark, walking grey (dashed)
+function legColour(leg) {
+    if (leg.mode === 'train') return lineColour(leg.line)
+    return leg.mode === 'bus' ? '#3A332D' : '#7A7068'
+}
+
+// the route the panel is showing (or null to clear it): draw it, then fit it on screen
+function showRoute(option) {
+    drawRoute(option)
+    if (option) fitRoute(option)
+}
+
+// draw (or clear, with null) a route: the coloured lines + numbered circles on the stops
+function drawRoute(option) {
+    routeStopMarkers.forEach((m) => m.remove())
+    routeStopMarkers = []
+    const features = (option?.legs ?? []).map((leg) => ({
+        type: 'Feature',
+        properties: { colour: legColour(leg), walk: leg.mode === 'walk' },
+        geometry: { type: 'LineString', coordinates: leg.path },
+    }))
+    map?.getSource('route')?.setData({ type: 'FeatureCollection', features })
+    if (!option) return
+
+    // numbered circles on the MemoryGo places on the way (same numbers as the list)
+    option.onTheWay.forEach((stop, i) => {
+        const el = document.createElement('span')
+        el.className = 'route-stop'
+        el.textContent = String(i + 1)
+        routeStopMarkers.push(new maplibregl.Marker({ element: el, anchor: 'bottom', offset: [0, -52] })
+            .setLngLat([stop.lng, stop.lat]).addTo(map))
+    })
+}
+
+function fitRoute(option) {
+    // fit the whole route in the part of the map the sheet / sidebar doesn't cover. cameraForBounds
+    // already counts the map's own padding (the sheet / sidebar space), so only small margins are added
+    // here: adding the sheet space twice made it give up on phones
+    const bounds = new maplibregl.LngLatBounds()
+    option.legs.forEach((leg) => leg.path.forEach((point) => bounds.extend(point)))
+    const camera = map.cameraForBounds(bounds, {
+        padding: { top: 50, bottom: 30, left: 40, right: 40 },
+        bearing: map.getBearing(),
+    })
+    if (camera) map.easeTo({ center: camera.center, zoom: camera.zoom, duration: 800 })
+    else map.easeTo({ center: bounds.getCenter(), zoom: 12, duration: 800 })
+}
+
+function focusOn({ lng, lat }) {
+    map.easeTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 16), padding: mapPadding(), duration: 600 })
 }
 
 // ---------- Search (components/map/PlaceSearch.vue) ----------
@@ -271,7 +355,7 @@ function onSearchPick(result) {
     searchMarker = null
 
     if (result.kind === 'place') {
-        selectPlace(result.place)
+        openPlace(result.place)
         return
     }
 
@@ -287,6 +371,8 @@ function onSearchPick(result) {
 
     selectedId.value = null
     map.flyTo({ center: [result.lng, result.lat], zoom: Math.max(map.getZoom(), 16), padding: mapPadding(), duration: 1200 })
+    destination.value = { name: result.name, sub: result.address, lat: result.lat, lng: result.lng }
+    if (!isWide.value && detent.value === 'down') detent.value = 'middle'
 }
 
 // First view: the user at street level, in the part of the map the sheet/sidebar doesn't cover
@@ -316,6 +402,8 @@ function centreOnMe() {
 // Step 6: tapping in will only be allowed when this is 'ok'
 const locationStatus = ref('waiting')
 let hasFix = false                           // true once a real location inside Singapore has arrived
+let linkedPlace = false                      // true when opened with ?place= (don't jump away to the user)
+const route = useRoute()
 
 // short on purpose: on a phone the note sits over the map, under the search bar
 const LOCATION_NOTES = {
@@ -345,8 +433,11 @@ function onLocation(position) {
     if (!hasFix) {
         hasFix = true
         userMarker.addTo(map)
-        showNearby()
-        selectNearest()
+        userDotOnMap = true
+        if (!linkedPlace) {
+            showNearby()
+            selectNearest()
+        }
     }
 }
 
@@ -402,6 +493,124 @@ async function tapIn() {
     }
 }
 
+// ---------- Live journey (stores/journey.js, lib/useJourney.js, components/map/JourneyHud.vue) ----------
+// "Start journey" on a route: the sheet, nav and search hide, the map tilts and follows you, and the
+// card at the top shows the next stop. Inside a stop's zone for 20 s → "You've arrived" → Tap in.
+// The trip lives in a store, so it carries on after the game. Minimise = normal map with a Resume bar
+const journey = useJourneyStore()
+const demo = useDemoWalk(journey)
+const demoAllowed = import.meta.env.DEV        // demo mode only while running `pnpm run dev`
+const demoOn = ref(false)                     // the demo's pretend position is in use
+
+// where the journey thinks you are: demo mode's pretend position, or your real one
+const journeyPos = computed(() => (demoOn.value && demo.position.value ? demo.position.value : userPos.value))
+const trip = useJourney(journeyPos, journey)
+
+const hudTapping = ref(false)
+const hudMessage = ref('')
+const updatingRoute = ref(false)
+let userDotOnMap = false                      // the blue dot only goes on the map once we know where you are
+
+function startJourney({ mode, option }) {
+    journey.start(destination.value, mode, option)
+    destination.value = null                  // the panel closes; the route stays drawn
+    drawRoute(option)
+    followYou()
+}
+
+function endJourney() {
+    journey.end()
+    demo.stop()
+    demoOn.value = false
+    drawRoute(null)
+    searchMarker?.remove()
+    searchMarker = null
+    map.easeTo({ center: userPos.value, zoom: 16, pitch: 45, bearing: -20, padding: mapPadding(), duration: 800 })
+}
+
+// the camera during a journey: close, tilted, turned to face the way the route goes
+function followYou() {
+    if (!map || !journey.showing) return
+    map.easeTo({
+        center: journeyPos.value,
+        zoom: 17,
+        pitch: 60,
+        bearing: trip.heading.value,
+        padding: mapPadding(),
+        duration: 900,
+    })
+}
+
+// "Tap in" on the "You've arrived" card: the same tap in as the button on the map, for that stop
+async function tapInAt(stop) {
+    if (hudTapping.value) return
+    hudTapping.value = true
+    hudMessage.value = ''
+    try {
+        const [lng, lat] = journeyPos.value
+        const { data } = await api.post('/visits/start', { placeId: stop.id, lat, lng })
+        trip.clearArrived()                   // this stop is done; the next one shows after the game
+        router.push({ path: `/games/${data.game}`, query: { visit: data.visitId, paid: data.paid ? '1' : '0' } })
+    } catch (error) {
+        hudMessage.value = error.response?.data?.message ?? 'Could not tap in. Please try again.'
+    } finally {
+        hudTapping.value = false
+    }
+}
+
+function skipStop() {
+    hudMessage.value = ''
+    trip.clearArrived()
+}
+
+// off the route: ask for a new one from where you are now, the same kind (MRT & bus / walk)
+async function updateRoute() {
+    if (updatingRoute.value || !journey.trip) return
+    updatingRoute.value = true
+    try {
+        const [lng, lat] = journeyPos.value
+        const { destination: dest, mode } = journey.trip
+        const { data } = await api.get('/route', {
+            params: { from: `${lat},${lng}`, to: `${dest.lat},${dest.lng}`, mode, name: dest.name },
+        })
+        journey.replaceRoute(data.options[0])
+        drawRoute(data.options[0])
+        trip.resetOffRoute()
+    } catch {
+        hudMessage.value = 'Couldn’t get a new route. Keep going, or try again in a moment.'
+    } finally {
+        updatingRoute.value = false
+    }
+}
+
+function toggleDemo() {
+    if (demo.running.value) {
+        demo.stop()
+        return
+    }
+    demoOn.value = true
+    demo.start(journeyPos.value)
+}
+
+// the blue dot follows the demo's pretend position too
+watch(journeyPos, (pos) => {
+    if (!userMarker || !pos) return
+    userMarker.setLngLat(pos)
+    if (demoOn.value && !userDotOnMap && map) {
+        userMarker.addTo(map)
+        userDotOnMap = true
+    }
+    if (demoOn.value) journey.demoPos = pos
+    followYou()
+})
+
+// opening / minimising the journey: tilt in, or settle back to the normal map
+watch(() => journey.showing, (showing) => {
+    if (!map) return
+    if (showing) followYou()
+    else map.easeTo({ pitch: 45, bearing: -20, zoom: 16, padding: mapPadding(), duration: 600 })
+})
+
 // Label the nearest place on the map (or nothing, if none is within 2 km)
 function selectNearest() {
     selectedId.value = visiblePlaces.value[0]?.place.id ?? null
@@ -419,7 +628,15 @@ async function loadPlaces() {
         // place.playedToday decides the card label ("Played today · back tomorrow")
         places.value = data.places.map((place) => ({ ...place, state: place.visited ? 'collected' : 'playable' }))
         placesStatus.value = 'ready'
-        selectNearest()
+
+        // "Show on map" from a Spirit's page (/map?place=12): open that place instead of the nearest one
+        const linked = places.value.find((place) => place.id === Number(route.query.place))
+        if (linked) {
+            linkedPlace = true
+            openPlace(linked)
+        } else {
+            selectNearest()
+        }
     } catch (error) {
         console.error(error)
         placesStatus.value = 'error'
@@ -462,7 +679,42 @@ onMounted(() => {
             source: 'zones',
             paint: { 'line-color': '#161412', 'line-width': 1.6, 'line-dasharray': [3, 3.5] },
         })
+        // directions: a white outline, then the coloured line (walking parts dashed)
+        map.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
+        map.addLayer({
+            id: 'route-outline',
+            type: 'line',
+            source: 'route',
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: { 'line-color': '#FFFFFF', 'line-width': 10 },
+        })
+        map.addLayer({
+            id: 'route-line',
+            type: 'line',
+            source: 'route',
+            filter: ['!', ['get', 'walk']],
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: { 'line-color': ['get', 'colour'], 'line-width': 6 },
+        })
+        map.addLayer({
+            id: 'route-walk',
+            type: 'line',
+            source: 'route',
+            filter: ['get', 'walk'],
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: { 'line-color': ['get', 'colour'], 'line-width': 5, 'line-dasharray': [0.1, 2] },
+        })
         map.addLayer(pins3d.layer)           // 3D pins + chests, drawn last so they sit on top
+
+        // back from a game in the middle of a journey: draw it again and carry on
+        if (journey.active) {
+            drawRoute(journey.trip.option)
+            if (journey.demoPos && demoAllowed) {
+                demoOn.value = true
+                demo.start(journey.demoPos)
+            }
+            followYou()
+        }
     })
 
     // Places come from the server; their markers are added once they arrive
@@ -515,24 +767,35 @@ watch([detent, isWide], () => map?.easeTo({ padding: mapPadding(), duration: 340
         <!-- darkens the map when the phone sheet is pulled all the way up -->
         <div class="dim" :class="{ on: detent === 'up' && !isWide }" aria-hidden="true"></div>
 
+        <!-- the live journey screen (replaces the search, sheet and nav while it's up) -->
+        <JourneyHud v-if="journey.showing" :trip="journey.trip" :next-stop="journey.nextStop"
+            :arrived="trip.arrived.value" :reached-end="trip.reachedEnd.value" :off-route="trip.offRoute.value"
+            :progress="trip.progress.value" :minutes-left="trip.minutesLeft.value"
+            :next-stop-metres="trip.nextStopMetres.value" :tapping="hudTapping" :message="hudMessage"
+            :demo-allowed="demoAllowed" :demo-running="demo.running.value" :updating="updatingRoute"
+            @tap-in="tapInAt" @skip="skipStop" @update-route="updateRoute" @end="endJourney"
+            @minimise="journey.minimised = true" @demo="toggleDemo" />
+
         <!-- phone only: search + coins along the top -->
-        <div class="topbar">
+        <div v-if="!journey.showing" class="topbar">
             <SearchBar class="topbar-search" @open="openSearch(false)" @mic="openSearch(true)" />
             <CoinPill :coins="coins" />
         </div>
 
         <!-- zoomed out too far for pins (they would pile up over the whole island) -->
         <!-- location problems first (they explain why the map isn't showing where you are) -->
-        <p v-if="locationStatus !== 'ok'" class="zoom-note" :class="{ 'note-wrap': locationStatus !== 'waiting' }"
-            role="status">
-            {{ LOCATION_NOTES[locationStatus] }}
-        </p>
-        <p v-else-if="placesStatus === 'ready' && mapZoom < MIN_PIN_ZOOM" class="zoom-note" role="status">
-            Zoom in to see places
-        </p>
+        <template v-if="!journey.showing">
+            <p v-if="locationStatus !== 'ok'" class="zoom-note" :class="{ 'note-wrap': locationStatus !== 'waiting' }"
+                role="status">
+                {{ LOCATION_NOTES[locationStatus] }}
+            </p>
+            <p v-else-if="placesStatus === 'ready' && mapZoom < MIN_PIN_ZOOM" class="zoom-note" role="status">
+                Zoom in to see places
+            </p>
+        </template>
 
         <!-- phone: one round button under the search bar. iPad/laptop: zoom + locate at the bottom-right -->
-        <div class="map-controls">
+        <div v-if="!journey.showing" class="map-controls">
             <button type="button" class="round-btn zoom-btn" aria-label="Zoom in" @click="zoomIn">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5 V19 M5 12 H19" /></svg>
             </button>
@@ -544,7 +807,7 @@ watch([detent, isWide], () => map?.easeTo({ padding: mapPadding(), duration: 340
             </button>
         </div>
 
-        <BottomSheet v-model:detent="detent">
+        <BottomSheet v-if="!journey.showing" v-model:detent="detent">
             <template #header>
                 <!-- iPad/laptop only: logo + search live inside the sidebar -->
                 <div class="sidebar-top">
@@ -553,8 +816,19 @@ watch([detent, isWide], () => map?.easeTo({ padding: mapPadding(), duration: 340
                         :knows-location="locationStatus === 'ok'" @pick="onSearchPick" />
                 </div>
 
+                <!-- a journey running in the background: back to it -->
+                <button v-if="journey.active" type="button" class="resume" @click="journey.minimised = false">
+                    <span class="resume-text">
+                        <span class="resume-title">On your way to {{ journey.trip.destination.name }}</span>
+                        <span class="resume-sub">
+                            {{ journey.nextStop ? `Next: ${journey.nextStop.name}` : `${trip.minutesLeft.value} min left` }}
+                        </span>
+                    </span>
+                    <span class="resume-btn">Resume</span>
+                </button>
+
                 <!-- inside a place's zone: tap in to play its game -->
-                <div v-if="tapInPlace" class="tap-in">
+                <div v-if="tapInPlace && !journey.active" class="tap-in">
                     <button type="button" class="tap-in-btn" :disabled="tapInState === 'starting'" @click="tapIn">
                         <span class="tap-in-dot"></span>
                         <span class="tap-in-text">
@@ -565,7 +839,7 @@ watch([detent, isWide], () => map?.easeTo({ padding: mapPadding(), duration: 340
                     <p v-if="tapInMessage" class="tap-in-message" role="alert">{{ tapInMessage }}</p>
                 </div>
 
-                <div class="near-row">
+                <div v-if="!destination" class="near-row">
                     <h1 class="near-title">Near <HandUnderline>you</HandUnderline></h1>
 
                     <div class="filters" role="group" aria-label="Show on map">
@@ -578,8 +852,14 @@ watch([detent, isWide], () => map?.easeTo({ padding: mapPadding(), duration: 340
                 </div>
             </template>
 
+            <!-- a place picked: its preview / directions instead of the "Near you" cards -->
+            <div v-if="destination" class="route-scroll">
+                <RoutePanel :destination="destination" :user-pos="userPos" :knows-location="locationStatus === 'ok'"
+                    @close="closeDestination" @show-route="showRoute" @focus="focusOn" @start="startJourney" />
+            </div>
+
             <!-- while the places load, or if the server can't be reached -->
-            <p v-if="placesStatus === 'loading'" class="places-note">Finding places near you…</p>
+            <p v-else-if="placesStatus === 'loading'" class="places-note">Finding places near you…</p>
             <div v-else-if="placesStatus === 'error'" class="places-note" role="alert">
                 <span>Couldn’t load places. Check your connection and try again.</span>
                 <button type="button" class="retry-btn" @click="loadPlaces">Try again</button>
@@ -591,11 +871,11 @@ watch([detent, isWide], () => map?.easeTo({ padding: mapPadding(), duration: 340
 
             <div v-else class="cards" :class="`cards-${cardLayout}`">
                 <PlaceCard v-for="{ place, distance } in visiblePlaces" :key="place.id" :place="place"
-                    :distance="distance" :layout="cardLayout" @select="selectPlace" />
+                    :distance="distance" :layout="cardLayout" @select="openPlace" />
             </div>
         </BottomSheet>
 
-        <AppNav :coins="coins" />
+        <AppNav v-if="!journey.showing" :coins="coins" />
 
         <!-- phones: full-screen search (covers the map, nav and sheet until a place is picked) -->
         <div v-if="searchOpen && !isWide" class="search-screen" role="dialog" aria-label="Search for a place">
@@ -897,6 +1177,54 @@ watch([detent, isWide], () => map?.easeTo({ padding: mapPadding(), duration: 340
     display: none;
 }
 
+/* ---------- Resume a minimised journey ---------- */
+.resume {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    margin-bottom: 14px;
+    padding: 12px 12px 12px 18px;
+    border: 0;
+    border-radius: 22px;
+    background: var(--user-blue);
+    color: var(--white);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.resume-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.resume-title {
+    overflow: hidden;
+    font-size: 17px;
+    font-weight: 700;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.resume-sub {
+    font-size: 15px;
+    font-weight: 500;
+    opacity: 0.9;
+}
+
+.resume-btn {
+    flex-shrink: 0;
+    padding: 10px 16px;
+    border-radius: var(--radius-pill);
+    background: var(--white);
+    color: var(--ink);
+    font-size: 16px;
+    font-weight: 700;
+}
+
 /* ---------- Tap in (inside a place's zone) ---------- */
 .tap-in {
     margin-bottom: 14px;
@@ -1003,6 +1331,31 @@ watch([detent, isWide], () => map?.easeTo({ padding: mapPadding(), duration: 340
 }
 
 /* ---------- card lists ---------- */
+/* the place preview / directions scroll inside the sheet / sidebar */
+.route-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+/* numbered circles above the pins of the places on the way */
+.map :deep(.route-stop) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: 3px solid var(--white);
+    border-radius: 50%;
+    background: var(--user-blue);
+    box-shadow: 0 4px 10px rgba(22, 20, 18, 0.3);
+    color: var(--white);
+    font-family: var(--font);
+    font-size: 15px;
+    font-weight: 800;
+    pointer-events: none;
+}
+
 /* "Finding places near you…" / "Couldn't load places" */
 .places-note {
     display: flex;

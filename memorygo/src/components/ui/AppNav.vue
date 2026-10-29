@@ -11,6 +11,7 @@ note:       Journey points to /menu for now (the old dashboard). It becomes the 
 
 <script setup>
 import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import CoinPill from './CoinPill.vue'
 
@@ -19,6 +20,10 @@ defineProps({
 })
 
 const auth = useAuthStore()
+const route = useRoute()
+
+// a page under a tab (e.g. /spirits/kopi) keeps that tab highlighted
+const isUnder = (to) => route.path.startsWith(`${to}/`)
 
 // First letter of the name they signed up with, for the round avatar
 const initial = computed(() => {
@@ -54,7 +59,8 @@ const tabs = [
 <template>
     <nav class="app-nav" aria-label="Main">
         <div class="tabs">
-            <router-link v-for="tab in tabs" :key="tab.to" :to="tab.to" class="tab">
+            <router-link v-for="tab in tabs" :key="tab.to" :to="tab.to" class="tab"
+                :class="{ 'router-link-active': isUnder(tab.to) }">
                 <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
                     stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
                     <path :d="tab.icon" />

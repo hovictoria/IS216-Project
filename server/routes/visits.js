@@ -231,10 +231,24 @@ router.post('/:id/finish', requireAuth, async (req, res) => {
         // 4. A paid game also counts towards the streak and "this week"
         if (paidOut.coins_earned > 0) await recordPlay(userId)
 
+        // 5. finish_visit also found this place's Spirit (first paid game here) and maybe finished a set:
+        //    send its details so the game can show "You found a Spirit!"
+        let spirit = null
+        if (paidOut.spirit_id) {
+            const { data } = await supabase
+                .from('spirit_catalog')
+                .select('id, name, color, rarity, set_name, lore')
+                .eq('id', paidOut.spirit_id)
+                .maybeSingle()
+            if (data) spirit = { id: data.id, name: data.name, color: data.color, rarity: data.rarity, set: data.set_name, lore: data.lore }
+        }
+
         res.json({
             paid: paidOut.coins_earned > 0,
             earned: { coins: paidOut.coins_earned, xp: paidOut.xp_earned },
             totals: { coins: paidOut.total_coins, xp: paidOut.total_xp },
+            spirit,                                                    // null, or the Spirit just found
+            setDone: paidOut.set_done ? { name: paidOut.set_done, bonus: paidOut.set_bonus } : null,
         })
     } catch (error) {
         console.error(error)

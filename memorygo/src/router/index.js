@@ -20,6 +20,7 @@ import oddoneout from "../views/games/oddoneout.vue"
 
 /* Collection */
 import collection from "../components/charactercollection.vue"
+import spirit from "../views/spirit.vue"
 
 /* Map */
 import mapView from "../views/map.vue" 
@@ -55,6 +56,11 @@ const router = createRouter({
     {
       path: "/spirits",
       component: collection,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: "/spirits/:id",
+      component: spirit,
       meta: { requiresAuth: true }
     },
     {

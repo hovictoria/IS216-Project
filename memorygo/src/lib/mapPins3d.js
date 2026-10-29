@@ -106,7 +106,8 @@ function buildPin(colour) {
 }
 
 // Chest: wooden box, gold bands, round lid that can open. About 1.3 tall with the lid shut
-function buildChest() {
+// (also used on its own by components/ui/ChestCanvas.vue, e.g. the Spirits tab's set card)
+export function buildChest() {
     const g = new Group()
     const H = 0.85
     g.add(mesh(geo.chestBase, mat.wood, [0, H / 2, 0]))

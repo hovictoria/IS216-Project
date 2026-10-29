@@ -16,12 +16,13 @@ import { singaporeToday } from './streak.js'
 
 const router = Router()
 
-// GET /api/places → [{ id, name, kind, category, lineCodes, lat, lng, radiusM, gameType, year, fact, visited, playedToday, inProgress }]
+// GET /api/places → [{ id, name, kind, category, lineCodes, lat, lng, radiusM, gameType, year, fact, visited, playedToday, inProgress,
+//                     spiritHidden, spiritFound }]
 // (no coin amount: rewards depend on how well you play, worked out when a visit finishes)
 router.get('/', requireAuth, async (req, res) => {
     const { data, error } = await supabase
         .from('places')
-        .select('id, name, kind, category, line_codes, lat, lng, radius_m, game_type, year, fact')
+        .select('id, name, kind, category, line_codes, lat, lng, radius_m, game_type, year, fact, url')
         .eq('is_active', true)          // hidden places stay in the table but don't show on the map
         .order('id')
 
@@ -53,8 +54,27 @@ router.get('/', requireAuth, async (req, res) => {
         .filter((v) => !v.finished_at && Date.now() - new Date(v.started_at) < 30 * 60_000)
         .map((v) => v.place_id))
 
+    // Spirits (docs/spirits.sql): which places have one, and which of those this user has found.
+    //   spiritHidden = a Spirit is hiding here and you haven't found it → chest pin, "A Spirit is hiding here"
+    //   spiritFound  = you've found this place's Spirit
+    // The Spirit's name isn't sent: what's hiding stays a surprise until you find it
+    const [{ data: catalog, error: catalogError }, { data: finds, error: findsError }] = await Promise.all([
+        supabase.from('spirit_catalog').select('id, place_id').not('place_id', 'is', null),
+        supabase.from('spirit_finds').select('spirit_id').eq('user_id', req.user.id),
+    ])
+
+    if (catalogError || findsError) {
+        console.error(catalogError ?? findsError)
+        return res.status(500).json({ message: 'Could not load places.' })
+    }
+
+    const foundSpiritIds = new Set(finds.map((f) => f.spirit_id))
+    const spiritAtPlace = new Map(catalog.map((c) => [c.place_id, c.id]))
+
     // database names (snake_case) -> JavaScript names (camelCase)
     const places = data.map((row) => ({
+        spiritHidden: spiritAtPlace.has(row.id) && !foundSpiritIds.has(spiritAtPlace.get(row.id)),
+        spiritFound: spiritAtPlace.has(row.id) && foundSpiritIds.has(spiritAtPlace.get(row.id)),
         visited: visitedIds.has(row.id),
         playedToday: finishedTodayIds.has(row.id),
         inProgress: inProgressIds.has(row.id),
@@ -69,6 +89,7 @@ router.get('/', requireAuth, async (req, res) => {
         gameType: row.game_type,
         year: row.year,
         fact: row.fact,
+        url: row.url,                   // "Read more" page (roots.gov.sg) for imported places
     }))
 
     res.json({ places })

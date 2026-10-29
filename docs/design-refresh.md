@@ -128,11 +128,10 @@ Phase 3: back end (places, search, routes)
         Follow-up: some official names are long ("Former Saint Joseph's Institution (now Singapore Art Museum)");
         rename them in Supabase if wanted, the import never overwrites names
 
-  Rebuilding the places from scratch (e.g. a teammate's Supabase), in this order:
-  1. `docs/places.sql`  2. `docs/places-seed.sql`  3. `docs/places-import.sql`  4. `node scripts/import-places.js`
-  Keep `places-seed.sql`: SMU Connexion, Spice Garden, Fort Canning Park and Capitol Theatre exist only there,
-  and it gives ids 1-17 (ids 1-6 = the old stations that `user_spirits.station_id` points at).
-  Don't clear the table before importing: the script merges into our rows by matching them.
+  The SQL files used to build the database (places.sql, places-seed.sql, places-import.sql, visits.sql,
+  visits-random-game.sql, spirit-places.sql) were run in the team's shared Supabase project and then removed
+  from the repo. The shared database is the record of how it's set up; the descriptions above still explain
+  what each one did. Don't clear the places table before re-importing: the script merges into our rows.
 - [ ] Step 6: `visits` + tap-in rewards. Decided: MRT pays the same as spots (5-15 coins, 10-30 XP, score-based)
   - [x] 6c prep: `/api/places` and `PlaceCard.vue` no longer use `reward_coins`; cards say "Up to 15 coins" /
         "Check in · up to 15" / "Replay · up to 15"
@@ -165,8 +164,98 @@ Phase 3: back end (places, search, routes)
         today; a new `inProgress` (tapped in < 30 min ago, not finished) shows "Continue · up to 15" and tapping
         in resumes the same paid game. An abandoned paid visit older than 30 min is released (paid → false) at
         the next tap-in, so it doesn't cost the day's reward
-  - [ ] Later: retire /api/progress/xp + /api/spirits/collect, drop Spirits from paid visits, "back to map"
-        after a tap-in game
+  - [ ] Later: retire /api/progress/xp (games-menu practice still pays through it), "back to map" after a
+        tap-in game
+
+Spirits (design: `~/Downloads/MemoryGo-spirits-handoff 2`, 24 Spirits in 6 area sets of 4, SVG designs are the look)
+
+- Decided: a Spirit is ALWAYS found on your first paid game at its place (no luck); rarity = how special / far the
+  place is; finishing a set's 4 gives a bonus chest (+50 coins, once); chest pins on the map = a Spirit is hiding
+  there. Grid / cards use the SVG drawings, the detail page + "You found a Spirit!" reveal use three.js (one at a time)
+- New tables `spirit_catalog`, `spirit_finds`, `spirit_sets_done`. The old `spirits` / `user_spirits` stay in
+  Supabase unused until the project is done. The new Spirits page follows the old `charactercollection.vue` logic
+  and style; that file is left untouched
+- [x] S1: Spirit places. 7 reused (#7 St Andrew's, #8 CHIJMES, #14 City Hall, #9 National Gallery, #3 Bras Basah,
+      #59 Thian Hock Keng, #120 MacRitchie). 16 added by spirit-places.sql (OneMap coordinates; run, then removed).
+      Toa Payoh Dragon Playground added by `docs/spirit-dragon-playground.sql` (Google Maps: 1.331996, 103.854332,
+      because OneMap doesn't list it)
+- [x] S2: `docs/spirits.sql` (run; 24 Spirits, all placed): `spirit_catalog` (colour, rarity, set, place, lore,
+      order; one Spirit per place), `spirit_finds` (one row per player per Spirit), `spirit_sets_done` (bonus once),
+      all server-only. `finish_visit()` replaced: same payout + a paid game finds the place's Spirit + last of a set
+      → +50 coins; also returns spirit_id, set_done, set_bonus. Lore: Kopi's from the design, 23 are drafts to edit
+- [x] S3 server:
+      - `routes/spirits.js` (the old file, same style, new tables): GET / → { spirits (with placeName, lat, lng,
+        set, rarity, lore, colour), found (spirit_id, found_at, game, visit_id), setsDone }; GET /today reads
+        spirit_finds; POST /collect retired (410 "Spirits are now found by playing a game at their place")
+      - `routes/visits.js` finish: also returns `spirit` (the Spirit just found, or null) and `setDone` ({ name, bonus })
+      - `routes/places.js`: each place has `spiritHidden` (a Spirit you haven't found is here → chest pin) and
+        `spiritFound`. The Spirit's name isn't sent, so it stays a surprise
+- [x] S4: 3D Spirits (three.js, matching the 24 SVGs) + SVGs copied into the app
+      - [x] the 24 drawings + `_locked.svg` copied to `memorygo/src/assets/spirits/` (checked: no scripts / links)
+      - [x] `src/three/spiritModel.js`: `buildSpirit({ id, color })` = squashed sphere body + face (eyes, cheeks, smile)
+            placed on the body's surface where the drawing has them, plus the Spirit's own parts (DECOR[id]).
+            Drawing → 3D: x → (x − 50) / 30, y → (58 − y) / 30 (every drawing's body is a circle at 50, 58, r 30);
+            flat parts (claws, crown) are traced from the SVG paths and given thickness. Lights: key light top-left
+            like the drawings' highlight; `addSpiritShadow()` = the soft oval under it
+      - [x] `src/components/spirits/SpiritCanvas.vue`: one live 3D Spirit (bob, sway, blink; still with reduce motion)
+      - [x] all 24 built and compared side by side with their drawings (front + turned)
+            - PAINTED parts (the part of each drawing clipped to the body circle: Kaya's layer, Kueh Lapis's
+              stripes, Boba's pearls, Rojak's sauce, Ondeh's flakes, ...) are read straight from the SVG and painted
+              onto the 3D body as a texture (`bodyPaintOf`, `projectFromFront`, `paintedMaterial`). They load a moment
+              later: `await model.ready` before taking a picture
+            - eye height read from each drawing (`eyeHeightOf`): faces sit higher when holding / wearing something
+            - parts that stick out are built per Spirit in DECOR (cups, bowls, cone, ring, bread, leaves, mooncake, ...)
+            - fixes after comparing: Boba's straw (same pink as the cheeks, first missed), Murtabak's lines, Prata
+              tipped towards the viewer, Kacang's cone made big enough to hold the body, Otah's leaf lowered off the smile
+      - S4 done
+- [x] S5: Spirits tab, in the friend's own file `components/charactercollection.vue` (her logic kept so she can follow it)
+      - kept: `spirits`, `found`, `loading`, `errorMsg`, `filter`, `categories`, `countTotal`, `countFound`, `isFound`,
+        `getFoundRow`, `formatDate`, `visibleSpirits`, `onMounted` try/catch/finally, her comments
+      - changed: `categories` = the 6 sets; `formatDate` reads `found_at`; `visibleSpirits` puts found ones first
+        (newest first) and has a "Not yet" filter; `onMounted` also reads `setsDone`
+      - added: `setsDone`, `coins`, `newest`, `currentSet`, `pictureOf(id)` (SVGs via `import.meta.glob`), `lockedPicture`
+      - removed: `AppMenu` (→ `AppNav`), `readAloud`, `stations` / `getStation`, the flip cards
+      - layout: header + progress "N of 24 found", newest card (or "Find your first"), set card ("Civic District set ·
+        3 of 4", +50 coins), All / Found / Not yet, grid of tiles (3 across on phone, 4 from 768px; `minmax(0, 1fr)`
+        so long place names wrap instead of widening a column). Locked tiles show `_locked.svg`, "???" and the place
+      - checked on phone and laptop with pretend data (5 found): 24 tiles, 0 broken pictures, "Not yet" shows 19
+- [x] S6: Spirit detail, `views/spirit.vue` at `/spirits/:id` (same GET /api/spirits, no server change)
+      - found: peach hero with the live 3D Spirit (`SpiritCanvas`), dashed ring + sparkles, back button, rarity chip
+        (Common white outlined, Rare `#A9CDE8`, Epic `#C9B8F5`, Legendary `#F3D57C`); name with the hand underline,
+        lore, 4 tiles (Found at, On, Game, Set "Civic District · 3 of 4"); "Show on map" + share ("Share with a kaki",
+        only on devices with a share sheet)
+      - not yet: grey hero with the "?" drawing, "???", "A Spirit is hiding at …", Hiding at + Set tiles, "Show on map"
+      - laptop / iPad: Spirit on the left, details on the right
+      - Spirits tab: every tile and the newest card now link here (`RouterLink`, in her file)
+      - "Show on map" → `/map?place=<id>`: `views/map.vue` opens that place's card once places load, and doesn't
+        jump away to the user when their location arrives
+      - checked with pretend data: phone + laptop, a locked one, and Show on map opening City Hall
+      - speed + prototype fixes (after "slow, doesn't follow the prototype"):
+            - slow part was the server, not 3D (3D build < 10 ms, 60 fps): GET /api/spirits ran its 3 queries one
+              after another (~0.5 s) and the Spirit page asked again. Now `Promise.all` in routes/spirits.js, and
+              `lib/spiritsCache.js` keeps the tab's answer so a tile opens its page at once (one fetch, not two)
+            - tab matched to screens/01-02: progress bar + "N of 24 found" on one row, arrow on the newest card,
+              glass = blur 24 + saturate 180% + inset highlight (tiles pick up the backdrop's colours), 300px glows
+              placed like the prototype, set card / filter / tile spacing and borders from the prototype
+            - detail: rarity chip ink with white text (like screens/03)
+            - kept on purpose: 16px minimum text (the prototype has 12-15px labels), 44px filter buttons
+      - set card chest is now 3D: `components/ui/ChestCanvas.vue` uses the SAME chest as the map's chest pins
+        (`buildChest` exported from `lib/mapPins3d.js`, same lights); bobs and peeks its lid open every 4 s, still
+        with reduce motion. `assets/spirits-chest.webp` is no longer used (not deleted yet)
+      - laptop design from `~/Downloads/MemoryGo-laptop-handoff` (LAPTOP_SPEC.md, screens 06 + 07):
+            - Spirits tab, 1200px+: wordmark top-left; left column 380px (title 76px, progress, newest card with a
+              120px Spirit, "Area sets" card listing all 6 sets with bars, ink bar when complete); right column
+              "All Spirits" + filter, all 24 in a 6-across grid (found = name + rarity chip in rarity colours,
+              not yet = "?" + place). Phone / iPad (< 1200px) unchanged. Tiles and newest card lift 4px on hover
+            - Spirit page, 1024px+: full-height sticky peach panel on the left (right corners 48px), "< All Spirits"
+              back pill, nav top-right, name 104px (72px under 1200), lore 21px, 4 info tiles, "<set> set" row of 4
+              mini tiles (this one ink-outlined, found white, missing dashed with its place), Show on map at the bottom
+            - Spirit page, iPad (768-1023px): stacked like the phone (720px wide) + the set row, no top nav (it
+              covered the rarity chip)
+            - AppNav: a page under a tab (/spirits/kopi) keeps that tab highlighted
+            - ChestCanvas skips drawing while hidden (the phone set card is hidden on laptop)
+            - not built: "Memory match · 9 moves" (scores aren't saved per find), "1 game away" chips
+- [ ] S7: "You found a Spirit!" reveal · S8: chest pins · S9: full test
 - [x] Step 7: OneMap account + search with a dropdown + microphone
   - `server/lib/onemap.js`: logs in with ONEMAP_EMAIL / ONEMAP_PASSWORD, keeps the token in memory, renews it
     an hour before it expires (or when OneMap rejects it). `searchOneMap(text)` → { name, address, postal, lat, lng }
@@ -184,8 +273,46 @@ Phase 3: back end (places, search, routes)
   - Gotcha: don't name a class `row` (Bootstrap's grid). Results use `.result`
   - Fix: with many results the rows overlapped (the flex column squashed them to fit its max height).
     `.panel > * { flex-shrink: 0 }` keeps every row full height, so the panel scrolls instead
-- [ ] Step 8: `/api/route` + "on the way" filter (Turf `pointToLineDistance`)
-- [ ] Step 9: live journey + tap in
+- [x] Step 8: routes ("Take me there"), like Google Maps
+  - `server/lib/onemap.js`: `routeOneMap(from, to, 'walk' | 'pt')` ("leaving now", Singapore time; up to 3
+    MRT + bus options) and `decodePolyline()` (OneMap packs each line into text like "}c|F{gzxR…")
+  - `server/routes/route.js`: GET /api/route?from=lat,lng&to=lat,lng&mode=transit|walk&name=… →
+    { options: [{ minutes, walkMeters, transfers, legs, onTheWay }] }. Each leg: walk / train / bus, line
+    (DT, 155), from / to (with station codes), stations passed, the line shape. Cached 2 min.
+    `planTrip()` is exported so it can be tried without a browser
+  - On the way: walking parts → places whose zone the path goes through; MRT parts → the stations you get on,
+    change and get off at (matched by code, DT21 = Bencoolen). Stations only ridden through are "passes", not games
+  - `memorygo/src/components/map/RoutePanel.vue`: place preview (name, what it is, distance, the data.gov.sg
+    description, "Read more on Roots.sg", Take me there) → MRT & bus | Walk, options with line chips in line
+    colours, step by step ("Downtown Line · 4 stops to Mattar MRT Station · passes Jalan Besar…"), numbered
+    "On your way" list. Start journey = placeholder (next step)
+  - `views/map.vue`: cards, pins and search picks open the panel (`openPlace`, `onSearchPick`); `showRoute()`
+    draws the legs (white outline; MRT in line colour, bus dark, walking dashed) + numbered stop circles and
+    fits the trip on screen; tapping a step or stop centres on it
+  - Gotcha: `map.cameraForBounds()` already includes the map's padding (sheet / sidebar). Adding it again made
+    it give up on phones, so only small margins are passed
+  - Tested with a real OneMap answer, SMU → Joo Seng: 3 options (32 / 32 / 34 min), up to 6 games on the way
+- [x] Step 9: live journey (prototype 10-Journey / 11-JourneyArrived), based on `reference-code/useJourney.js`
+  - `stores/journey.js` (Pinia): the trip in progress (destination, mode, chosen option, stops, doneIds,
+    minimised, demoPos). Survives going into a game and back; a page refresh ends it (memory only)
+  - `lib/useJourney.js`: progress along the route, minutes left, next stop + distance, ARRIVED = inside a stop's
+    zone for 20 s (a bus passing by doesn't count; any stop on the trip, not only the next one), reached the
+    destination (60 m), OFF ROUTE = 40 m from the line for 15 s, heading for the camera, Wake Lock (screen on).
+    Our own maths, no Turf. `useDemoWalk()` = demo mode: walks a pretend you along the route (~1 min) and waits at
+    each stop (stepping up to 35 m into zones the route only grazes) until Tap in / Not now
+  - `components/map/JourneyHud.vue`: stop dots (✓ done), one top card (next stop / dark "You've arrived" with Tap in
+    + Not now / off route + Update route / reached destination + Finish trip), bottom bar (To …, minutes left,
+    progress, End journey → "End this trip?" Keep going / End trip, minimise), demo button
+  - `views/map.vue`: Start journey (RoutePanel) → sheet, nav, search hide; map tilts (pitch 60, zoom 17) and turns
+    with the route; Tap in on the card uses POST /api/visits/start for that stop, then opens the game; back on the
+    map the trip carries on (route redrawn, demo resumes). Minimise → normal map with a blue "On your way to … ·
+    Resume" bar. Update route asks /api/route again from where you are (same mode), keeping done stops
+  - Start journey needs a real location, except in `pnpm run dev`. Demo mode is dev-only because tap-in trusts the
+    location the page sends
+  - `server/routes/route.js`: each stop on the way now includes `radiusM`
+  - Tested (phone, demo mode, real SMU → Joo Seng route): start → arrive (Bras Basah: the SMU start is already
+    inside its zone) → Tap in opens the game → back to the map continues with ✓ → minimise / Resume → End asks
+    first. Fix during testing: Tap in was black on the black card; now white
 
 Pin colours (decided for step 6): green = "you've been here", and it STAYS green (the map fills up with green
 as you explore). Whether a place pays today is shown on the card instead: "Up to 15 coins" (never played),

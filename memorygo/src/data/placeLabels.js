@@ -24,3 +24,19 @@ export const MRT_COLOURS = {
     DT: '#005EC4',
     TE: '#9D5B25',
 }
+
+// Full line names for directions ("Downtown Line" instead of "DT"). CG (Changi Airport branch) and
+// CE (Circle Line extension) are shown as their main lines
+export const MRT_LINE_NAMES = {
+    NS: 'North-South Line',
+    EW: 'East-West Line',
+    CG: 'East-West Line',
+    CC: 'Circle Line',
+    CE: 'Circle Line',
+    NE: 'North East Line',
+    DT: 'Downtown Line',
+    TE: 'Thomson-East Coast Line',
+}
+
+// the colour for any line code, including the branches above ('CG' → East-West green)
+export const lineColour = (code) => MRT_COLOURS[{ CG: 'EW', CE: 'CC' }[code] ?? code] ?? '#161412'

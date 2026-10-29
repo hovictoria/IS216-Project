@@ -20,6 +20,7 @@ import streakRoutes from './routes/streak.js'
 import placesRoutes from './routes/places.js'
 import visitsRoutes from './routes/visits.js'
 import searchRoutes from './routes/search.js'
+import routeRoutes from './routes/route.js'
 
 const PORT = Number(process.env.PORT) || 8000
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173' 
@@ -44,6 +45,8 @@ app.use('/api/places', placesRoutes)
 app.use('/api/visits', visitsRoutes)
 
 app.use('/api/search', searchRoutes)
+
+app.use('/api/route', routeRoutes)
 
 
 
