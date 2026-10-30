@@ -70,7 +70,7 @@ const textToRead = computed(() => props.speech || `${props.title}. ${props.intro
     <!-- Header -->
     <header class="game-header d-flex align-items-center justify-content-between px-3 px-md-4 py-3">
       <router-link :to="exitTo" class="btn btn-pill rounded-pill px-3 px-md-4">
-        <i class="fa-solid fa-xmark me-2"></i>Stop
+        <i class="fa-solid fa-arrow-left me-2"></i>Back
       </router-link>
 
       <div class="brand d-none d-md-flex align-items-center gap-2">
