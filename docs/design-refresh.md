@@ -282,9 +282,9 @@ Spirits (design: `~/Downloads/MemoryGo-spirits-handoff 2`, 24 Spirits in 6 area 
         Also exports `greeting` (Good morning / afternoon / evening; evening whenever it's night), used by the
         map search bar, the search panel placeholder and the Journey greeting
       - `styles/night.css` (all night rules in one file, every rule starts with html.night): landing / sign in /
-        sign up = night sky #1C2140 + stars (SkyBackdrop .stars) + pale moon + island dimmed (brightness .68,
-        saturate .85), light text on the sky, paper sheet stays dark text; map = deep blue tint
-        rgba(22,30,76,.64) multiply right above the map picture (`.night-tint` added in views/map.vue, under the blue
+        sign up = night sky #232A4E + stars (SkyBackdrop .stars) + pale moon + island dimmed (brightness .76,
+        saturate .88), light text on the sky, paper sheet stays dark text; map = deep blue tint
+        rgba(22,30,76,.56) multiply right above the map picture (`.night-tint` added in views/map.vue, under the blue
         dot); Journey + Spirits tabs = darker blurred map, indigo #5B4BB5 + blue #2F6FB0 glows, light headings,
         glass cards ~80% solid. Spirit page, Me page and game pages keep the light paper look. Haze still dropped
       - demo walk removed: `useDemoWalk` + `pointAt` (lib/useJourney.js), `demoPos` (stores/journey.js), the
@@ -307,6 +307,11 @@ Spirits (design: `~/Downloads/MemoryGo-spirits-handoff 2`, 24 Spirits in 6 area 
       paper map. `components/spirits/PaperMap.vue` = the landing page's paper map style (river, roads, blocks,
       parks, dotted route to a pin) recoloured for peach, faded at the edges; colours are CSS variables, so the
       "not found yet" page uses greys. Used on the Spirit page hero and the "You found a Spirit!" popup
+- [x] Browser tab icon (2026-10-30): `public/logo.svg` = a round badge made from the head of the app logo's pin
+      (orange ring, cream face, the two cards + tick) with a soft 3D look (light from the top-left, shine). It fills
+      the whole square so it reads at 16px; the full pin was too thin in a tab. `public/apple-touch-icon.png`
+      (180px, on paper colour) keeps the full soft 3D pin for a phone's home screen. Linked in index.html.
+      The logo inside the app (`src/assets/app-logo.png`) is unchanged; `public/favicon.ico` is no longer used
 - [ ] Journey tab (built, waiting on `docs/journey.sql` + a real test)
       - decisions (2026-10-30): today's challenge = finish paid games at 2 places today → +50 coins once a day;
         Puzzle of the day = one of our 6 games (same for everyone, turns each day) paying the game's coins + 20

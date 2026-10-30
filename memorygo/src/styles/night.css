@@ -11,7 +11,7 @@ imports:    loaded once in main.js
 ---------------------------------------------------------------------------------------------------------- */
 
 html.night {
-    --night-sky: #1C2140;
+    --night-sky: #232A4E;
     --night-text: #F4F0E8;
     --night-indigo: #5B4BB5;
     --night-blue: #2F6FB0;
@@ -30,7 +30,7 @@ html.night .auth {
 html.night .auth .glow {
     background:
         radial-gradient(ellipse 55% 45% at 60% 55%, rgba(91, 75, 181, 0.45), rgba(91, 75, 181, 0) 70%),
-        linear-gradient(180deg, #141834 0%, #1C2140 55%, #262B52 100%);
+        linear-gradient(180deg, #1A1F40 0%, #232A4E 55%, #2E3460 100%);
 }
 
 /* small white stars (SkyBackdrop.vue) */
@@ -52,7 +52,7 @@ html.night .auth .sun {
 /* the island is lit by moonlight: dimmer and a little less colourful */
 html.night .auth .island canvas,
 html.night .journey-page .island canvas {
-    filter: brightness(0.68) saturate(0.85);
+    filter: brightness(0.76) saturate(0.88);
 }
 
 /* links on the sky (logo, Sign in, "I already have an account", back) turn light;
@@ -92,7 +92,7 @@ html.night .night-tint {
     display: block;
     position: absolute;
     inset: 0;
-    background: rgba(22, 30, 76, 0.64);
+    background: rgba(22, 30, 76, 0.56);
     mix-blend-mode: multiply;
     pointer-events: none;
 }
@@ -108,7 +108,7 @@ html.night .spirits-page {
 
 html.night .journey-page .backdrop-map,
 html.night .spirits-page .backdrop-map {
-    filter: blur(18px) saturate(1.1) brightness(0.45);
+    filter: blur(18px) saturate(1.1) brightness(0.52);
     opacity: 0.7;
 }
 

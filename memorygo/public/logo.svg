@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 960">
+  <!-- MemoryGo tab icon: the head of the app logo's pin (src/assets/app-logo.png) as a round badge that fills
+       the square, so it reads at 16px. Soft 3D: light from the top-left, a shine across the top -->
+  <defs>
+    <radialGradient id="pinShade" cx="0.35" cy="0.25" r="0.85">
+      <stop offset="0" stop-color="#DA7550"/><stop offset="0.55" stop-color="#B84A2A"/><stop offset="1" stop-color="#8A3519"/>
+    </radialGradient>
+    <radialGradient id="faceShade" cx="0.5" cy="0.4" r="0.6">
+      <stop offset="0.8" stop-color="#FAF2E4"/><stop offset="1" stop-color="#E9DCC6"/>
+    </radialGradient>
+    <linearGradient id="yellowShade" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F8D46A"/><stop offset="1" stop-color="#E2AE3A"/>
+    </linearGradient>
+    <linearGradient id="greenShade" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4E8C5E"/><stop offset="1" stop-color="#2D6640"/>
+    </linearGradient>
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- orange ring + cream face -->
+  <circle cx="480" cy="480" r="470" fill="url(#pinShade)"/>
+  <circle cx="480" cy="480" r="350" fill="url(#faceShade)"/>
+  <!-- two cards -->
+  <rect x="215" y="275" width="270" height="380" rx="44" fill="url(#yellowShade)" transform="rotate(-12 350 465)"/>
+  <rect x="470" y="290" width="285" height="380" rx="44" fill="url(#greenShade)" transform="rotate(10 612 480)"/>
+  <polyline points="540,480 594,534 696,418" fill="none" stroke="#FAF2E4" stroke-width="48" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- shine -->
+  <path d="M140 330 C 220 140 520 40 760 120 C 560 90 300 160 140 330 Z" fill="url(#gloss)"/>
+</svg>
