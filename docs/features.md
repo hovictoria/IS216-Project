@@ -8,6 +8,36 @@ short brain game when you arrive at one, and you collect coins, XP and Spirits.
 
 ---
 
+## At a glance: each feature and how it's done
+
+| Feature | How it's done (big picture) |
+|---|---|
+| **Places (MRT stations + heritage spots)** | **Seeded once from data.gov.sg** with our own script (`server/scripts/import-places.js`), using 3 government datasets: Monuments and Historic Sites (National Heritage Board) and MRT Station Exits (LTA, the exits grouped into one point per station). Saved in our `places` table in Supabase. The app reads from our table, never from data.gov.sg. The script can be re-run safely if the data changes |
+| **MRT line codes** (EW13, NS25 …) | Looked up from **OneMap search** during the same one-time import |
+| **Spirit places** | Most Spirits use places that already came from data.gov.sg. The few that weren't there (e.g. Toa Payoh Dragon Playground) were **added by hand with SQL** in Supabase |
+| **The 24 Spirits** | Designed as 2D drawings (SVG). Their names, rarity, set, place and story were **added by hand with SQL** (`spirit_catalog` table). The **3D versions are built in code with three.js** from those drawings |
+| **Sign up / sign in** | **Supabase Auth** (Supabase's ready-made login system: email + password) |
+| **The map** | **MapLibre** (free open-source map library) with free map tiles from **OpenFreeMap**, recoloured by us to the warm paper look |
+| **3D pins, chests, island** | Built in code with **three.js**, drawn inside the map |
+| **Your location (blue dot)** | The **browser's location service** (GPS / Wi-Fi on the phone or laptop). Not saved anywhere |
+| **Search for a place** | **OneMap search API** (Singapore government map service), called through our server |
+| **Voice search (microphone)** | The **browser's built-in speech recognition** (Singapore English). No outside service |
+| **Directions** | **OneMap routing API** (walking, or MRT + bus), called through our server |
+| **"Games on the way"** | **Our own server** compares the OneMap route with our `places` table: stations where you get on / off, and play zones your walk passes |
+| **Journey (arrived, off route)** | **Worked out in the browser** from your live location and the route: 20 s inside a zone = arrived, 40 m off the route for 15 s = off route. The screen is kept on with the browser's **Wake Lock** |
+| **Tap in + which game** | **Our Express server** checks you're inside the zone, picks a random game, and saves the visit in Supabase |
+| **Coins and XP** | **Our server** scores the game result with our formulas, and a **database function in Supabase** pays it in one step (so it can't pay twice) |
+| **Finding a Spirit + set bonus** | The **same database function**: your first paid game at the Spirit's place finds it; finishing a set of 4 pays +50 |
+| **Puzzle of the day / today's challenge** | **Our server** picks the day's game from the date, and a small `daily_rewards` table makes sure each bonus is paid once a day |
+| **6 brain games** | Built in Vue by the team, inside the app (no outside service) |
+| **Day / night look** | The **device clock** (7 pm – 6 am = night) and our own styles. No outside service |
+| **Fonts** | **Google Fonts** |
+
+The browser never talks to the database or to OneMap directly. It always goes through **our Express server**, which
+holds the secret keys (Supabase service key, OneMap login) in `server/.env`.
+
+---
+
 ## 1. Pages
 
 | Page | Address | What's on it |
@@ -197,7 +227,88 @@ The old `spirits` / `user_spirits` tables are still in Supabase but no longer us
 
 ---
 
-## 10. Still to do
+## 10. How it's done: outside services and step-by-step flows
+
+### Outside services we connect to
+| Service | What we use it for | How we connect |
+|---|---|---|
+| **Supabase** | Logins (accounts, passwords) and the database | **Logins:** the browser uses Supabase's sign-up / sign-in with the public key (`memorygo/.env.local`). **Data:** only our server reads and writes tables, with the secret service key in `server/.env`. Row Level Security blocks the browser from every table |
+| **OneMap** (Singapore Land Authority) | Place search and directions (walk / MRT + bus) | Our server logs in to OneMap with the team's OneMap account (`server/.env`), gets a token (lasts ~3 days), keeps it in memory only and renews it an hour before it runs out. The browser never sees the login or the token: it only calls our `/api/search` and `/api/route` (`server/lib/onemap.js`) |
+| **data.gov.sg** | The list of MRT stations and historic sites | Used **once** by `server/scripts/import-places.js` to fill the `places` table. The app doesn't call it while running |
+| **OpenFreeMap** | The map pictures (streets, buildings) | MapLibre loads the free "liberty" map style and tiles straight from OpenFreeMap; we recolour it to our warm paper look (`lib/paperMapStyle.js`). No key needed |
+| **Google Fonts** | The fonts (Inter Tight; Fraunces / Nunito Sans on the Me and game pages) | Loaded by the browser |
+
+### Tools inside the app (no outside service)
+| Tool | Used for |
+|---|---|
+| **MapLibre GL** | Draws the map, play zones, route lines; follows you during a journey |
+| **three.js** (+ TresJS on the landing page) | 3D island, 3D pins and chests on the map, 3D Spirits, 3D chest on cards |
+| **Browser location** (Geolocation API) | Your blue dot, "Near you", tap-in distance, journeys |
+| **Browser speech** (Web Speech API, `en-SG`) | The microphone in search: turns what you say into text, in the browser |
+| **Screen Wake Lock** | Keeps the phone screen on during a journey |
+| **Pinia / Vue Router** | Remembers the logged-in user and the trip in progress; moves between pages |
+
+### How a request travels
+Every call from the browser to our server goes through `memorygo/src/lib/api.js`, which adds the player's login
+token (`Authorization: Bearer …`). On the server, `middleware/auth.js` asks Supabase "who is this token?" (`requireAuth`)
+before any route runs, so each route knows the player and only touches **their** rows.
+
+### Flow: searching for a place
+1. You type "National Library" (or say it into the microphone; the browser turns speech into text).
+2. Browser → `GET /api/search?q=national library` on our server.
+3. Server → OneMap search (with its token), tidies the names ("NATIONAL LIBRARY" → "National Library"), removes
+   duplicates, keeps 8. Answers are remembered for 10 minutes so the same search doesn't ask OneMap again.
+4. The dropdown shows the results; picking one moves the map there and opens the place preview.
+
+### Flow: directions and "places on the way"
+1. **Take me there** → browser sends `GET /api/route?from=<you>&to=<place>&mode=transit` (or `walk`).
+2. Server → OneMap routing ("leaving now", Singapore time). OneMap sends each route as legs (walk / train / bus)
+   with the line drawn as a compressed "polyline", which the server decodes into map points.
+3. Server works out the **MemoryGo places on the way** from our `places` table:
+   - **walking parts:** places whose play zone the walking line passes through ("walk past");
+   - **train parts:** the stations where you **get on** and **get off** (matched by station code, e.g. NS25).
+4. Browser draws the route (train lines in their MRT colour, walking dashed) with numbered stops, and lists the
+   options with their minutes and "N games on the way". Answers are remembered for 2 minutes.
+
+### Flow: a journey
+1. **Start journey** saves the trip in the browser (`stores/journey.js`) and the map starts following you.
+2. Every time the browser reports a new location, `lib/useJourney.js` works out (in the browser, no server):
+   how far along you are, minutes left, which stop is next, whether you've been **inside a stop's zone for 20 s**
+   (→ "You've arrived"), and whether you've been **40 m off the route for 15 s** (→ "Update route" asks the server
+   for a new route from where you are).
+
+### Flow: tap in → game → coins + Spirit
+1. **Tap in** → `POST /api/visits/start` with the place and your location.
+2. Server checks: inside the zone? the nearest zone you're in? paid already today here? 5 minutes since your last
+   paid game? It picks a random game (not the last one you played here) and saves the visit (distance only).
+3. Browser opens that game, e.g. `/games/pattern?visit=123`.
+4. When the game ends it calls `claim()` (`lib/gamereward.js`) → `POST /api/visits/123/finish` with the result.
+5. Server scores it (`streak.js` formulas), then one database function (`finish_visit`) does everything at once:
+   pays coins + XP (only if the visit is paid), marks the visit finished, finds this place's Spirit if you haven't got
+   it, and pays the +50 set bonus if that completes a set. Then it ticks "This week" and checks today's challenge
+   (2 places → +50, `daily_rewards`).
+6. Browser shows "You earned …", then "You found a Spirit!" if there is one, then "Level up!" if you went up a level.
+
+### Flow: Puzzle of the day
+1. The server picks today's game from the date (the 6 games take turns), so everyone gets the same one.
+2. The Journey tab opens it as `/games/<game>?puzzle=1`. When it ends, `claim()` sends the result to
+   `POST /api/journey/puzzle/finish`.
+3. Server checks it's today's game, scores it, and `claim_daily` pays (game coins + 20) **only if** there's no puzzle
+   payment for you today yet. That check and the payment happen in one database step.
+
+### Flow: the Spirits pages
+`GET /api/spirits` returns all 24 Spirits (with their place), the ones you found and the sets you finished; the
+server runs those 3 database queries at the same time. The Spirits tab keeps that answer in memory
+(`lib/spiritsCache.js`) so tapping a Spirit opens its page instantly. Pictures in the grid are the 2D drawings
+(`assets/spirits/*.svg`); the Spirit page and the popup build the 3D model in the browser (`three/spiritModel.js`).
+
+### Flow: day / night
+No outside service: `lib/useMood.js` reads the device clock (night 7 pm – 6 am) when the app opens and on every page
+change, and adds `class="night"` to the page; `styles/night.css` holds all the night styles.
+
+---
+
+## 11. Still to do
 - Full test at real places (chest → tap in → "You found a Spirit!" → green pin) and of the daily bonuses.
 - Game pages still say "You earned 0 XP and 0 coins" for practice; could say "Practice · no coins".
 - Personal bests on the Play anytime tiles.
