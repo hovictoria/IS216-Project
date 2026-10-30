@@ -73,7 +73,9 @@ function nextRound() {
 }
 
 function startGame() {
-    pads.value = pickPads()   // a fresh set of pictures each game
+    // keep the pictures the player already sees on the first start;
+    // pick a fresh set only when they press "Try again"
+    if (status.value === 'lost') pads.value = pickPads()
     sequence.value = []
     nextRound()
 }
