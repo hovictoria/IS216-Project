@@ -2,16 +2,17 @@
 import { ref, computed } from 'vue'
 import GameLayout from '../../components/games/GameLayout.vue'
 import GameProgress from '../../components/games/GameProgress.vue'
+import GameReward from '../../components/games/GameReward.vue'
 
 import LevelUpNotice from '@/components/LevelUpNotice.vue'
 
 import { useGameReward } from '@/lib/gamereward'
-import flour from '@/assets/flour.webp'
-import nutella from '@/assets/nutella.webp'
+import flour from '@/assets/flour.png'
+import nutella from '@/assets/nutella.png'
 import apples from '@/assets/apples.png'
 import blueberry from '@/assets/blueberry.png'
-import oats from '@/assets/oats.webp'
-import pizza from '@/assets/pizza.webp'
+import oats from '@/assets/oats.png'
+import pizza from '@/assets/pizza.png'
 const { reward, claim, reset } = useGameReward('memory')
 function shuffle(array) {
     const arr = [...array]
@@ -133,12 +134,7 @@ function isFaceUp(card) {
       :results="pairResults"
     />
    
-    <Transition name="rise">
-    <div v-if="reward" class="text-center fw-bold mt-4 mb-4" aria-live="polite">
-        <i class="fa-solid fa-star text-gold me-2"></i>
-        You earned {{ reward.earned.xp }} XP and {{ reward.earned.coins }} coins.
-    </div>
-    </Transition>
+    <GameReward :reward="reward" />
     
     <LevelUpNotice :reward="reward" />
     <button class="btn btn-memory w-100 fw-bold py-2 mb-3" :disabled="peeking" @click="showCards">
@@ -190,7 +186,7 @@ function isFaceUp(card) {
 </template>
 
 <style scoped>
-
+/* Only game-specific styles live here. Colours, buttons and rewards come from the shared components. */
 
 .memory-card {
     aspect-ratio: 1;
@@ -221,40 +217,40 @@ function isFaceUp(card) {
     align-items: center;
     justify-content: center;
     gap: 4px;
-    border-radius: 1rem;
+    border-radius: 20px;
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
-    box-shadow: 0 3px 6px #0002;
+    box-shadow: 0 3px 10px rgba(22, 20, 18, 0.14);
 }
 
+/* Face down: black card with a peach pin, like the map markers */
 .face.back {
-    background: var(--blue);
-    border: 2px solid var(--blue);
+    background: var(--ink);
+    border: 2px solid var(--ink);
 }
 
 .card-back {
     width: calc(100% - 14px);
     height: calc(100% - 14px);
-    border: 2px dashed #ffffffcc;
-    color: #fff;
+    border: 2px dashed rgba(246, 196, 164, 0.7);
+    color: var(--peach);
 }
 
+/* Face up: white card */
 .face.front {
     transform: rotateY(180deg);
-    background: #fffdf6;
-    border: 2px solid var(--gold);
-    box-shadow: 0 0 0 2px var(--gold);
+    background: #fff;
+    border: 2px solid var(--ink);
 }
 
 .memory-card.matched .face.front {
-    background: #e4efdc;
+    background: var(--green-soft);
     border-color: var(--green);
-    box-shadow: 0 3px 6px #0002;
 }
 
 .memory-card:focus-visible {
-    outline: 3px solid var(--gold);
-    outline-offset: 2px;
+    outline: 3px solid var(--blue);
+    outline-offset: 3px;
 }
 
 .card-img {
@@ -273,31 +269,18 @@ function isFaceUp(card) {
 }
 
 .memory-card .check {
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
 }
+
 .memory-card.wrong {
     animation: shake 0.5s ease 0.4s;   /* waits for the flip to finish */
 }
+
 .cards-move {
     transition: transform 0.6s ease;
 }
-.rise-enter-active {
-    transition: opacity 0.5s ease, transform 0.5s ease;
-}
-.rise-enter-from {
-    opacity: 0;
-    transform: translateY(12px);
-}
-.dot.filled {
-    animation: dot-pop 0.4s ease;
-}
 
-@keyframes dot-pop {
-    0%   { transform: scale(0.4); }
-    60%  { transform: scale(1.3); }
-    100% { transform: scale(1); }
-}
 @media (min-width: 768px) {
     .card-img {
         width: 62%;
@@ -322,5 +305,17 @@ function isFaceUp(card) {
     0%   { transform: scale(1); }
     50%  { transform: scale(1.12); }
     100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .card-inner,
+    .cards-move {
+        transition: none;
+    }
+
+    .memory-card.matched,
+    .memory-card.wrong {
+        animation: none;
+    }
 }
 </style>

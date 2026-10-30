@@ -2,25 +2,25 @@
 defineProps({
     // Text on the left, e.g. "You've found 2 of 6 pairs."
     label: { type: String, required: true },
-    // Number of dots
+    // Number of segments
     total: { type: Number, default: 0 },
-    // One entry per finished step: true = green dot, false = muted red dot
+    // One entry per finished step: true = green segment, false = peach segment
     results: { type: Array, default: () => [] }
 })
 </script>
 
 <template>
-  <div class="progress-box p-md-2 mb-3">
-    <div class="progress-inner d-flex align-items-center justify-content-between p-md-3">
-      <strong>{{ label }}</strong>
+  <div class="progress-box mb-3">
+    <div class="progress-inner d-flex align-items-center justify-content-between gap-3">
+      <strong class="progress-label">{{ label }}</strong>
 
-      <!-- Replace the dots with your own content if needed -->
+      <!-- Replace the segments with your own content if needed -->
       <slot name="end">
-        <div v-if="total" class="d-flex gap-1" aria-hidden="true">
+        <div v-if="total" class="segs d-flex gap-1" aria-hidden="true">
           <span
             v-for="n in total"
             :key="n"
-            class="dot rounded-circle"
+            class="seg"
             :class="{
               filled: results[n - 1] === true,
               missed: results[n - 1] === false
@@ -33,33 +33,51 @@ defineProps({
 </template>
 
 <style scoped>
-/* Boxed on desktop, plain row on mobile */
+.progress-label {
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+/* Little rounded bars instead of dots */
+.seg {
+    width: 20px;
+    height: 10px;
+    border-radius: 999px;
+    background: rgba(22, 20, 18, 0.14);
+}
+
+.seg.filled {
+    background: var(--green);
+    animation: seg-pop 0.4s ease;
+}
+
+.seg.missed {
+    background: var(--peach);
+    box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+/* Glass chip on desktop, plain row on mobile */
 @media (min-width: 768px) {
     .progress-box {
-        border: 1px solid #e6dfc9;
-        border-radius: 18px;
-        background: #fdfaef;
+        padding: 0.9rem 1.25rem;
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        border-radius: 22px;
+        box-shadow: var(--glass-shadow);
+        -webkit-backdrop-filter: blur(20px) saturate(170%);
+        backdrop-filter: blur(20px) saturate(170%);
     }
-
-    .progress-inner {
-        border: 1px dashed #ddd5bb;
-        border-radius: 14px;
-    }
+    .seg { width: 26px; height: 12px; }
 }
 
-.dot {
-    width: 14px;
-    height: 14px;
-    border: 1.5px dashed #c9c3ad;
+@keyframes seg-pop {
+    0%   { transform: scaleY(0.4); }
+    60%  { transform: scaleY(1.5); }
+    100% { transform: scaleY(1); }
 }
 
-.dot.filled {
-    border: none;
-    background: var(--green);
-}
-
-.dot.missed {
-    border: none;
-    background: #d9b3ad;
+@media (prefers-reduced-motion: reduce) {
+    .seg.filled { animation: none; }
 }
 </style>

@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import GameLayout from '../../components/games/GameLayout.vue'
 import GameProgress from '../../components/games/GameProgress.vue'
+import GameReward from '../../components/games/GameReward.vue'
 import { useGameReward } from '@/lib/gamereward'
 
 import LevelUpNotice from '@/components/LevelUpNotice.vue'
@@ -111,16 +112,13 @@ const speech = computed(() =>
       :total="TOTAL_ROUNDS"
       :results="results"
     />
-    <div v-if="reward" class="text-center fw-bold mt-4" aria-live="polite">
-      <i class="fa-solid fa-star text-gold me-2"></i>
-      You earned {{ reward.earned.xp }} XP and {{ reward.earned.coins }} coins.
-    </div><br>
+    <GameReward :reward="reward" />
     <LevelUpNotice :reward="reward" />
     
     <template v-if="!finished">
 
       <!-- Object -->
-      <div class="object mx-auto mb-4 d-flex align-items-center justify-content-center rounded-4 shadow-sm">
+      <div class="g-tile object mx-auto mb-4 d-flex align-items-center justify-content-center">
         {{ question.emoji }}
       </div>
 
@@ -128,7 +126,7 @@ const speech = computed(() =>
       <div class="row row-cols-2 g-3">
         <div v-for="option in question.options" :key="option" class="col">
           <button
-            class="option w-100 py-3 position-relative fw-bold rounded-4 shadow-sm"
+            class="g-option option w-100 py-3 position-relative fw-bold"
             :class="optionClass(option)"
             :disabled="answered"
             @click="choose(option)"
@@ -161,48 +159,26 @@ const speech = computed(() =>
 </template>
 
 <style scoped>
-/* Only game-specific styles live here. Everything else is in the shared components. */
+/* Only game-specific styles live here. Tiles, answer buttons and colours are the shared
+   .g-tile / .g-option styles in GameLayout. */
 
 /* Object picture */
 .object {
     width: 180px;
     height: 180px;
-    border: 2px solid #e3dcc6;
-    background: #fffdf6;
     font-size: 90px;
     line-height: 1;
 }
 
 /* Answer options */
 .option {
-    border: 2px solid var(--blue);
-    background: #fffdf6;
+    min-height: 64px;
     color: var(--ink);
-    font-size: 18px;
-}
-
-.option:hover:not(:disabled) {
-    background: #fff;
-    box-shadow: 0 0 0 2px var(--blue);
+    font-size: 1.2rem;
 }
 
 .option:disabled {
     cursor: default;
-}
-
-.option:focus-visible {
-    outline: 3px solid var(--gold);
-    outline-offset: 2px;
-}
-
-.option.correct {
-    background: #e4efdc;
-    border-color: var(--green);
-}
-
-.option.wrong {
-    background: #f6dcd8;
-    border-color: var(--red);
 }
 
 @media (max-width: 767.98px) {

@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import GameLayout from '../../components/games/GameLayout.vue'
 import GameProgress from '../../components/games/GameProgress.vue'
+import GameReward from '../../components/games/GameReward.vue'
 import { useGameReward } from '@/lib/gamereward'
 
 import LevelUpNotice from '@/components/LevelUpNotice.vue'
@@ -109,10 +110,7 @@ const speech = computed(() => `Pattern Recognition. ${instruction.value}`)
       :total="TOTAL_ROUNDS"
       :results="results"
     />
-    <div v-if="reward" class="text-center fw-bold mt-4" aria-live="polite">
-        <i class="fa-solid fa-star text-gold me-2"></i>
-        You earned {{ reward.earned.xp }} XP and {{ reward.earned.coins }} coins.
-    </div><br>
+    <GameReward :reward="reward" />
     <LevelUpNotice :reward="reward" />
     
     <template v-if="!finished">
@@ -122,12 +120,12 @@ const speech = computed(() => `Pattern Recognition. ${instruction.value}`)
         <span
           v-for="(item, i) in round.shown"
           :key="i"
-          class="tile d-flex align-items-center justify-content-center rounded-3 shadow-sm"
+          class="g-tile tile d-flex align-items-center justify-content-center"
         >
           {{ item }}
         </span>
         <span
-          class="tile blank d-flex align-items-center justify-content-center rounded-3"
+          class="g-tile tile blank d-flex align-items-center justify-content-center"
           :aria-label="answered ? round.answer : 'Missing picture'"
         >
           {{ answered ? round.answer : '?' }}
@@ -138,7 +136,7 @@ const speech = computed(() => `Pattern Recognition. ${instruction.value}`)
       <div class="row row-cols-4 g-2 g-md-3">
         <div v-for="option in round.options" :key="option" class="col">
           <button
-            class="option w-100 p-0 position-relative d-flex align-items-center justify-content-center rounded-4 shadow-sm"
+            class="g-option option w-100 p-0 position-relative d-flex align-items-center justify-content-center"
             :class="optionClass(option)"
             :disabled="answered"
             @click="choose(option)"
@@ -171,27 +169,29 @@ const speech = computed(() => `Pattern Recognition. ${instruction.value}`)
 </template>
 
 <style scoped>
-/* Only game-specific styles live here. Everything else is in the shared components. */
+/* Only game-specific styles live here. Tiles, answer buttons and colours are the shared
+   .g-tile / .g-option styles in GameLayout. */
 
-/* Pattern tiles */
-.tile {
+/* Pattern tiles (small, so a smaller corner radius than the shared tile) */
+.tile.g-tile {
     width: 46px;
     height: 46px;
-    border: 2px solid #e3dcc6;
-    background: #fffdf6;
+    border-radius: 14px;
     font-size: 26px;
     line-height: 1;
 }
 
+/* The missing spot */
 .tile.blank {
-    border: 2px dashed var(--gold);
-    background: #fbf0cf;
-    color: var(--gold);
-    font-weight: bold;
+    border: 2px dashed var(--gold-deep);
+    background: #fdf3d3;
+    color: var(--gold-deep);
+    font-weight: 800;
+    box-shadow: none;
 }
 
 @media (min-width: 768px) {
-    .tile {
+    .tile.g-tile {
         width: 52px;
         height: 52px;
         font-size: 30px;
@@ -201,33 +201,12 @@ const speech = computed(() => `Pattern Recognition. ${instruction.value}`)
 /* Answer options */
 .option {
     aspect-ratio: 1;
-    border: 2px solid var(--blue);
-    background: #fffdf6;
+    color: var(--ink);
     font-size: 36px;
     line-height: 1;
 }
 
-.option:hover:not(:disabled) {
-    background: #fff;
-    box-shadow: 0 0 0 2px var(--blue);
-}
-
 .option:disabled {
     cursor: default;
-}
-
-.option:focus-visible {
-    outline: 3px solid var(--gold);
-    outline-offset: 2px;
-}
-
-.option.correct {
-    background: #e4efdc;
-    border-color: var(--green);
-}
-
-.option.wrong {
-    background: #f6dcd8;
-    border-color: var(--red);
 }
 </style>
