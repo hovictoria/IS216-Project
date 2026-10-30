@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import GameLayout from '../../components/games/GameLayout.vue'
 import GameProgress from '../../components/games/GameProgress.vue'
 import GameReward from '../../components/games/GameReward.vue'
@@ -7,12 +7,9 @@ import GameReward from '../../components/games/GameReward.vue'
 import LevelUpNotice from '@/components/LevelUpNotice.vue'
 
 import { useGameReward } from '@/lib/gamereward'
-import flour from '@/assets/flour.png'
-import nutella from '@/assets/nutella.png'
-import apples from '@/assets/apples.png'
-import blueberry from '@/assets/blueberry.png'
-import oats from '@/assets/oats.png'
-import pizza from '@/assets/pizza.png'
+
+import { getImages, preload } from '@/lib/gameimages'
+
 const { reward, claim, reset } = useGameReward('memory')
 function shuffle(array) {
     const arr = [...array]
@@ -23,29 +20,31 @@ function shuffle(array) {
     return arr
 }
 
-// 6 pairs = 12 cards
-const items = [
-    { value: 'flour', label: 'flour', image:flour },
-    { value: 'nutella', label: 'nutella', image:nutella },
-    { value: 'apples', label: 'apples', image:apples },
-    { value: 'blueberry', label: 'blueberry', image:blueberry },
-    { value: 'oats', label: 'oats', image:oats },
-    { value: 'pizza', label: 'pizza', image:pizza }
-    
-]
+// Pictures: the shared set plus any extras in src/assets/game-images/memory/
+const pool = getImages('memory').map(img => ({ value: img.id, label: img.name, image: img.src }))
 
-const cards = ref(shuffle(
-    items.flatMap((item, i) => [
-        { id: i * 2 + 1, ...item, flipped: false, matched: false, wrong: false },
-        { id: i * 2 + 2, ...item, flipped: false, matched: false, wrong: false }
-    ])
-))
+const PAIRS = 6   // keep at 6: the reward formula on the server expects 6 pairs
+const totalPairs = Math.min(PAIRS, pool.length)
+if (pool.length < PAIRS) console.warn('Memory Match needs at least 6 pictures in src/assets/game-images/')
+
+// Picks a fresh set of pictures each game, two cards of each, shuffled
+function createCards() {
+    return shuffle(
+        shuffle(pool).slice(0, totalPairs).flatMap((item, i) => [
+            { id: i * 2 + 1, ...item, flipped: false, matched: false, wrong: false },
+            { id: i * 2 + 2, ...item, flipped: false, matched: false, wrong: false }
+        ])
+    )
+}
+
+const cards = ref(createCards())
+
+onMounted(() => preload(getImages('memory')))
 
 const selectedCards = ref([])
 const moves = ref(0)
 const peeking = ref(false)
 
-const totalPairs = items.length
 const pairsFound = computed(() => cards.value.filter(c => c.matched).length / 2)
 
 // One green dot per pair found
@@ -94,12 +93,7 @@ function checkMatch() {
 }
 
 function restartGame() {
-    cards.value.forEach(card => {
-        card.flipped = false
-        card.matched = false
-    })
-
-    cards.value = shuffle(cards.value)
+    cards.value = createCards()
     selectedCards.value = []
     moves.value = 0
     peeking.value = false
