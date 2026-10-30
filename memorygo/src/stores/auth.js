@@ -5,6 +5,7 @@
 //             2. const isLoggedIn  = a boolean derived from user. It is used under router/index.js for redirect guards
 //             3. function init     = restores a saved session on startup and then keeps user updated for rest of the app's life through a listener
 //             4. function signIn   = helps with signin. Sends email and password variables to Supabase and reports back
+//             5. function sendPasswordReset / updatePassword = forgot password: email a reset link, then save the new password
 // imports:    imports supabase to use supabase methods. Imports defineStore from pinia
 // ----------------------------------------------------------------------------------------------------------
 
@@ -67,6 +68,31 @@ export const useAuthStore = defineStore('auth', () => {
         return "We couldn't create your account. Please check your details and try again."
     }
 
+    // Helps with forgot password: Supabase emails a link that opens /reset-password
+    // Returns null on success, or a friendly message to show the user
+    async function sendPasswordReset(email) {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${window.location.origin}/reset-password`,
+        })
+        if (!error) return null
+        return "We couldn't send the email just now. Please wait a minute and try again."
+    }
+
+    // Saves a new password. The reset link has already signed the user in
+    // Returns null on success, or a friendly message to show the user
+    async function updatePassword(password) {
+        const { error } = await supabase.auth.updateUser({ password })
+        if (!error) return null
+
+        if (error.message.toLowerCase().includes('different')) {
+            return 'Please choose a password you have not used before.'
+        }
+        if (error.message.toLowerCase().includes('password')) {
+            return 'Please choose a longer password (at least 6 characters).'
+        }
+        return "We couldn't save your new password. Please ask for a new reset link."
+    }
+
     // Helps with the signOut
     async function signOut() {
         await supabase.auth.signOut()
@@ -85,5 +111,5 @@ export const useAuthStore = defineStore('auth', () => {
         })
     }
 
-    return { user, isLoggedIn, init, signIn, signUp, signOut }
+    return { user, isLoggedIn, init, signIn, signUp, signOut, sendPasswordReset, updatePassword }
 })
