@@ -1,20 +1,25 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import GameLayout from '../../components/games/GameLayout.vue'
 import GameProgress from '../../components/games/GameProgress.vue'
 import GameReward from '../../components/games/GameReward.vue'
 import { useGameReward } from '@/lib/gamereward'
+import { getCategories, preload } from '@/lib/gameimages'
 
 import LevelUpNotice from '@/components/LevelUpNotice.vue'
 
 const { reward, claim, reset } = useGameReward('odd-one-out')
 
-const categories = {
-    fruit: ['🍎', '🍌', '🍇', '🍓', '🍊', '🍉'],
-    animal: ['🐶', '🐱', '🐘', '🐟', '🐦', '🐮'],
-    vehicle: ['🚗', '🚲', '🚌', '✈️', '🚢', '🚂'],
-    clothing: ['👕', '👒', '🧦', '🧤', '👗', '👟']
+// Pictures grouped by folder: src/assets/game-images/categories/<name>/
+// e.g. categories/fruit/apple.png, categories/animal/cat.png. The folder name is the category.
+// You need at least 2 categories, and at least one with 3+ pictures.
+const categories = getCategories()
+
+if (Object.keys(categories).length < 2) {
+    console.warn('Odd One Out needs at least 2 folders of pictures in src/assets/game-images/categories/')
 }
+
+onMounted(() => preload(Object.values(categories).flat()))
 
 const TOTAL_ROUNDS = 5
 
@@ -28,7 +33,9 @@ function shuffle(array) {
 }
 
 function createRound() {
-    const [groupName, oddName] = shuffle(Object.keys(categories))
+    // the group needs 3 pictures, the odd one comes from any other category
+    const groupName = shuffle(Object.keys(categories).filter(k => categories[k].length >= 3))[0]
+    const oddName = shuffle(Object.keys(categories).filter(k => k !== groupName))[0]
     const group = shuffle(categories[groupName]).slice(0, 3)
     const odd = shuffle(categories[oddName])[0]
 
@@ -43,12 +50,12 @@ const finished = ref(false)
 
 const score = computed(() => results.value.filter(Boolean).length)
 const answered = computed(() => chosen.value !== null)
-const isCorrect = computed(() => chosen.value === round.value.odd)
+const isCorrect = computed(() => chosen.value?.id === round.value.odd.id)
 
 function choose(option) {
     if (answered.value) return
     chosen.value = option
-    results.value.push(option === round.value.odd)
+    results.value.push(option.id === round.value.odd.id)
 }
 
 function nextRound() {
@@ -73,8 +80,8 @@ function restartGame() {
 
 function optionClass(option) {
     if (!answered.value) return ''
-    if (option === round.value.odd) return 'correct'
-    if (option === chosen.value) return 'wrong'
+    if (option.id === round.value.odd.id) return 'correct'
+    if (option.id === chosen.value?.id) return 'wrong'
     return ''
 }
 
@@ -83,8 +90,8 @@ const instruction = computed(() => {
     if (!answered.value) return 'Three of these belong together. Which one does not?'
     const { odd, groupName } = round.value
     return isCorrect.value
-        ? `Correct! ${odd} is not a ${groupName === 'clothing' ? 'piece of clothing' : groupName}. 🎉`
-        : `Not quite. ${odd} is the one that doesn't belong with the ${groupName === 'clothing' ? 'clothing' : groupName + 's'}.`
+        ? `Correct! ${odd.name} is not a ${groupName === 'clothing' ? 'piece of clothing' : groupName}. 🎉`
+        : `Not quite. ${odd.name} is the one that doesn't belong with the ${groupName === 'clothing' ? 'clothing' : groupName + 's'}.`
 })
 
 // Text for the Read aloud button
@@ -112,7 +119,7 @@ const speech = computed(() => `Odd One Out. ${instruction.value}`)
 
       <!-- Options -->
       <div class="row row-cols-2 g-3 mb-3">
-        <div v-for="option in round.options" :key="option" class="col">
+        <div v-for="option in round.options" :key="option.id" class="col">
           <button
             class="g-option option w-100 p-0 position-relative d-flex align-items-center justify-content-center"
             :class="optionClass(option)"
@@ -120,13 +127,13 @@ const speech = computed(() => `Odd One Out. ${instruction.value}`)
             @click="choose(option)"
           >
             <span
-              v-if="answered && option === round.odd"
+              v-if="answered && option.id === round.odd.id"
               class="check position-absolute top-0 end-0 m-2 rounded-circle d-flex align-items-center justify-content-center"
               aria-hidden="true"
             >
               <i class="fa-solid fa-check"></i>
             </span>
-            {{ option }}
+            <img :src="option.src" :alt="option.name" class="pic" draggable="false" />
           </button>
         </div>
       </div>
@@ -154,20 +161,21 @@ const speech = computed(() => `Odd One Out. ${instruction.value}`)
 /* Only game-specific styles live here. Answer buttons and colours are the shared
    .g-option styles in GameLayout. */
 
+.pic {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    padding: 14%;
+    user-select: none;
+    pointer-events: none;
+}
+
 .option {
     aspect-ratio: 1;
     color: var(--ink);
-    font-size: 64px;
-    line-height: 1;
 }
 
 .option:disabled {
     cursor: default;
-}
-
-@media (max-width: 767.98px) {
-    .option {
-        font-size: 52px;
-    }
 }
 </style>

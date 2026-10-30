@@ -1,15 +1,23 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import GameLayout from '../../components/games/GameLayout.vue'
 import GameProgress from '../../components/games/GameProgress.vue'
 import GameReward from '../../components/games/GameReward.vue'
 import { useGameReward } from '@/lib/gamereward'
+import { getImages, preload } from '@/lib/gameimages'
 
 import LevelUpNotice from '@/components/LevelUpNotice.vue'
 
 const { reward, claim, reset } = useGameReward('pattern')
 
-const symbols = ['🌸', '🐶', '🌳', '🐘', '⭐', '🍎']
+// Pictures: the shared set plus any extras in src/assets/game-images/pattern/
+// You need at least 4 pictures (one right answer plus 3 wrong ones), and 6 or more is better.
+const symbols = getImages('pattern')
+
+if (symbols.length < 4) console.warn('Pattern Recognition needs at least 4 pictures in src/assets/game-images/')
+
+onMounted(() => preload(symbols))
+
 const TOTAL_ROUNDS = 5
 
 // Each template is a full pattern. The last item is the answer.
@@ -35,7 +43,7 @@ function createRound() {
     const picked = shuffle(symbols)
     const full = template.map(n => picked[n])
     const answer = full[full.length - 1]
-    const distractors = shuffle(symbols.filter(s => s !== answer)).slice(0, 3)
+    const distractors = shuffle(symbols.filter(s => s.id !== answer.id)).slice(0, 3)
 
     return {
         shown: full.slice(0, -1),
@@ -53,11 +61,17 @@ const finished = ref(false)
 const score = computed(() => results.value.filter(Boolean).length)
 const answered = computed(() => chosen.value !== null)
 
+// How many tiles per row, so a long pattern wraps into even rows (e.g. 9 tiles = 5 + 4)
+const cols = computed(() => {
+    const total = round.value.shown.length + 1
+    return total <= 6 ? total : Math.ceil(total / 2)
+})
+
 function choose(option) {
     if (answered.value) return
 
     chosen.value = option
-    results.value.push(option === round.value.answer)
+    results.value.push(option.id === round.value.answer.id)
 
     setTimeout(() => {
         if (roundNumber.value === TOTAL_ROUNDS) {
@@ -73,8 +87,8 @@ function choose(option) {
 
 function optionClass(option) {
     if (!answered.value) return ''
-    if (option === round.value.answer) return 'correct'
-    if (option === chosen.value) return 'wrong'
+    if (option.id === round.value.answer.id) return 'correct'
+    if (option.id === chosen.value?.id) return 'wrong'
     return ''
 }
 
@@ -104,6 +118,7 @@ const speech = computed(() => `Pattern Recognition. ${instruction.value}`)
     :desktop-intro="instruction"
     :speech="speech"
     exit-to="/map"
+    wide
   >
     <GameProgress
       :label="`Round ${roundNumber} of ${TOTAL_ROUNDS}. ${score} correct.`"
@@ -116,25 +131,26 @@ const speech = computed(() => `Pattern Recognition. ${instruction.value}`)
     <template v-if="!finished">
 
       <!-- Pattern -->
-      <div class="d-flex flex-wrap justify-content-center gap-2 mb-4">
+      <div class="pattern mb-4 mb-md-5" :style="{ '--cols': cols }">
         <span
           v-for="(item, i) in round.shown"
           :key="i"
           class="g-tile tile d-flex align-items-center justify-content-center"
         >
-          {{ item }}
+          <img :src="item.src" :alt="item.name" class="pic" draggable="false" />
         </span>
         <span
           class="g-tile tile blank d-flex align-items-center justify-content-center"
-          :aria-label="answered ? round.answer : 'Missing picture'"
+          :aria-label="answered ? round.answer.name : 'Missing picture'"
         >
-          {{ answered ? round.answer : '?' }}
+          <img v-if="answered" :src="round.answer.src" alt="" class="pic" draggable="false" />
+          <template v-else>?</template>
         </span>
       </div>
 
       <!-- Answer options -->
-      <div class="row row-cols-4 g-2 g-md-3">
-        <div v-for="option in round.options" :key="option" class="col">
+      <div class="options mx-auto row row-cols-4 g-2 g-md-4">
+        <div v-for="option in round.options" :key="option.id" class="col">
           <button
             class="g-option option w-100 p-0 position-relative d-flex align-items-center justify-content-center"
             :class="optionClass(option)"
@@ -142,13 +158,13 @@ const speech = computed(() => `Pattern Recognition. ${instruction.value}`)
             @click="choose(option)"
           >
             <span
-              v-if="answered && option === round.answer"
+              v-if="answered && option.id === round.answer.id"
               class="check position-absolute top-0 end-0 m-1 rounded-circle d-flex align-items-center justify-content-center"
               aria-hidden="true"
             >
               <i class="fa-solid fa-check"></i>
             </span>
-            {{ option }}
+            <img :src="option.src" :alt="option.name" class="pic" draggable="false" />
           </button>
         </div>
       </div>
@@ -172,41 +188,86 @@ const speech = computed(() => `Pattern Recognition. ${instruction.value}`)
 /* Only game-specific styles live here. Tiles, answer buttons and colours are the shared
    .g-tile / .g-option styles in GameLayout. */
 
-/* Pattern tiles (small, so a smaller corner radius than the shared tile) */
+/* Pictures fill their square without stretching or cropping */
+.pic {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    padding: 10%;
+    user-select: none;
+    pointer-events: none;
+}
+
+/* The pattern: tiles shrink to fit small screens, and grow on a laptop */
+.pattern {
+    --tile: 64px;
+    display: grid;
+    grid-template-columns: repeat(var(--cols), minmax(0, var(--tile)));
+    justify-content: center;
+    gap: 8px;
+}
+
 .tile.g-tile {
-    width: 46px;
-    height: 46px;
-    border-radius: 14px;
-    font-size: 26px;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+    border-radius: 16px;
+    font-size: 1.8rem;
     line-height: 1;
 }
 
 /* The missing spot */
 .tile.blank {
-    border: 2px dashed var(--gold-deep);
+    border: 3px dashed var(--gold-deep);
     background: #fdf3d3;
     color: var(--gold-deep);
     font-weight: 800;
     box-shadow: none;
 }
 
-@media (min-width: 768px) {
-    .tile.g-tile {
-        width: 52px;
-        height: 52px;
-        font-size: 30px;
-    }
+/* Answer options */
+.options {
+    max-width: 640px;
 }
 
-/* Answer options */
 .option {
     aspect-ratio: 1;
     color: var(--ink);
-    font-size: 36px;
-    line-height: 1;
+}
+
+.option .pic {
+    padding: 14%;
 }
 
 .option:disabled {
     cursor: default;
+}
+
+/* Laptop: much bigger pictures and a thicker outline, easier to see and tap */
+@media (min-width: 768px) {
+    .pattern {
+        --tile: 104px;
+        gap: 14px;
+    }
+
+    .tile.g-tile {
+        border-radius: 22px;
+        font-size: 3rem;
+    }
+
+    .options {
+        max-width: 680px;
+    }
+
+    .option.g-option {
+        border-width: 3px;
+        border-radius: 26px;
+    }
+
+    .option .check {
+        width: 32px;
+        height: 32px;
+        font-size: 16px;
+    }
 }
 </style>

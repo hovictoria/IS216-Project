@@ -1,25 +1,26 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import GameLayout from '../../components/games/GameLayout.vue'
 import GameProgress from '../../components/games/GameProgress.vue'
 import GameReward from '../../components/games/GameReward.vue'
 import { useGameReward } from '@/lib/gamereward'
+import { getImages, preload } from '@/lib/gameimages'
 
 import LevelUpNotice from '@/components/LevelUpNotice.vue'
 
 const { reward, claim, reset } = useGameReward('object-id')
-const items = [
-    { emoji: '🍎', name: 'Apple' },
-    { emoji: '🚗', name: 'Car' },
-    { emoji: '🐱', name: 'Cat' },
-    { emoji: '🌙', name: 'Moon' },
-    { emoji: '🏠', name: 'House' },
-    { emoji: '🚲', name: 'Bicycle' },
-    { emoji: '🍌', name: 'Banana' },
-    { emoji: '🐟', name: 'Fish' },
-    { emoji: '☂️', name: 'Umbrella' },
-    { emoji: '⚽', name: 'Ball' }
-]
+
+// Pictures: the shared set plus any extras in src/assets/game-images/object-id/
+// The file name is the answer shown on the button, so "tea-cup.png" becomes "Tea cup".
+const items = getImages('object-id').map(img => ({
+    src: img.src,
+    name: img.name.charAt(0).toUpperCase() + img.name.slice(1)
+}))
+
+// each question needs 1 right answer + 3 wrong ones, and there are 5 questions
+if (items.length < 5) console.warn('Object Identification needs at least 5 pictures in src/assets/game-images/')
+
+onMounted(() => preload(getImages('object-id')))
 
 const TOTAL_ROUNDS = 5
 
@@ -119,7 +120,7 @@ const speech = computed(() =>
 
       <!-- Object -->
       <div class="g-tile object mx-auto mb-4 d-flex align-items-center justify-content-center">
-        {{ question.emoji }}
+        <img :src="question.src" alt="The object to identify" class="pic" draggable="false" />
       </div>
 
       <!-- Answer options -->
@@ -164,10 +165,17 @@ const speech = computed(() =>
 
 /* Object picture */
 .object {
-    width: 180px;
-    height: 180px;
-    font-size: 90px;
-    line-height: 1;
+    width: 200px;
+    height: 200px;
+}
+
+.pic {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    padding: 12%;
+    user-select: none;
+    pointer-events: none;
 }
 
 /* Answer options */
@@ -183,9 +191,8 @@ const speech = computed(() =>
 
 @media (max-width: 767.98px) {
     .object {
-        width: 150px;
-        height: 150px;
-        font-size: 72px;
+        width: 160px;
+        height: 160px;
     }
 }
 </style>

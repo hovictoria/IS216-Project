@@ -1,20 +1,39 @@
 <script setup>
-import { ref, computed, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import GameLayout from '../../components/games/GameLayout.vue'
 import GameProgress from '../../components/games/GameProgress.vue'
 import GameReward from '../../components/games/GameReward.vue'
 import { useGameReward } from '@/lib/gamereward'
+import { getImages, preload } from '@/lib/gameimages'
 
 import LevelUpNotice from '@/components/LevelUpNotice.vue'
 
 const { reward, claim, reset } = useGameReward('sequence')
 
-const pads = [
-    { id: 0, emoji: '🌸' },
-    { id: 1, emoji: '🌳' },
-    { id: 2, emoji: '🐘' },
-    { id: 3, emoji: '🐶' }
-]
+// Pictures: the shared set plus any extras in src/assets/game-images/sequence/
+// Each new game picks 4 of them at random. You need at least 4 pictures, and the more
+// different they look from each other, the easier the game is to follow.
+const pool = getImages('sequence')
+const PAD_COUNT = 4
+
+if (pool.length < PAD_COUNT) console.warn('Sequence Recall needs at least 4 pictures in src/assets/game-images/')
+
+function shuffle(array) {
+    const arr = [...array]
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[arr[i], arr[j]] = [arr[j], arr[i]]
+    }
+    return arr
+}
+
+function pickPads() {
+    return shuffle(pool).slice(0, PAD_COUNT).map((img, i) => ({ id: i, name: img.name, src: img.src }))
+}
+
+const pads = ref(pickPads())
+
+onMounted(() => preload(pool))
 
 const sequence = ref([])
 const playerIndex = ref(0)
@@ -48,12 +67,13 @@ async function showSequence() {
 }
 
 function nextRound() {
-    sequence.value.push(Math.floor(Math.random() * pads.length))
+    sequence.value.push(Math.floor(Math.random() * pads.value.length))
     showSequence()
     reset();
 }
 
 function startGame() {
+    pads.value = pickPads()   // a fresh set of pictures each game
     sequence.value = []
     nextRound()
 }
@@ -118,10 +138,10 @@ const speech = computed(() => `Sequence Recall. ${message.value}`)
             class="pad w-100 p-0 d-flex align-items-center justify-content-center"
             :class="{ active: activePad === pad.id, waiting: status !== 'playing' && activePad !== pad.id }"
             :disabled="status !== 'playing'"
-            :aria-label="`Pad ${pad.emoji}`"
+            :aria-label="pad.name"
             @click="pressPad(pad.id)"
           >
-            {{ pad.emoji }}
+            <img :src="pad.src" alt="" class="pic" draggable="false" />
           </button>
         </div>
       </div>
@@ -153,9 +173,16 @@ const speech = computed(() => `Sequence Recall. ${message.value}`)
     background: #fff;
     color: var(--ink);
     box-shadow: 0 2px 8px rgba(22, 20, 18, 0.08);
-    font-size: 64px;
-    line-height: 1;
     transition: transform 0.1s, background-color 0.1s;
+}
+
+.pic {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    padding: 14%;
+    user-select: none;
+    pointer-events: none;
 }
 
 .pad:not(:disabled):hover {
