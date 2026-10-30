@@ -15,6 +15,13 @@ import '@fortawesome/fontawesome-free/css/all.min.css'
 // Design tokens + page defaults from the handoff. Loaded after Bootstrap so ours win
 import '@/styles/tokens.css'
 import '@/styles/base.css'
+// the Me page's fonts + Sign out button (from the old dashboard, which was removed)
+import '@/styles/legacy.css'
+// night look (7 pm to 6 am): lib/useMood.js adds class="night" to <html>, styles/night.css styles it
+import '@/styles/night.css'
+import { startMood } from '@/lib/useMood'
+
+startMood()
 
 const app = createApp(App)
 app.use(createPinia())

@@ -54,7 +54,7 @@ const steps = ["Search where you're going", 'Play games on the way', 'Collect Sp
 
 .title {
     margin: 12px 0 0;
-    font-family: var(--font);     /* views/main.vue sets every h1 to Fraunces; override it */
+    font-family: var(--font);     /* the app font (not the browser's heading font) */
     font-size: clamp(56px, 18vw, 76px);
     font-weight: 700;
     line-height: 0.95;

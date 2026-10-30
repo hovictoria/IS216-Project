@@ -4,7 +4,7 @@ import { useAuthStore } from '@/stores/auth'
 import { api } from '@/lib/api'
 import { stations } from '@/data/stations'
 import { levelFromXp, progressToNext } from '@/config/progression'
-import AppMenu from '@/components/menu.vue'
+import AppNav from '@/components/ui/AppNav.vue'   // the app's nav (the old sidebar menu was removed)
 import { useRouter } from "vue-router";
 
 const auth = useAuthStore()
@@ -144,7 +144,7 @@ watch(
 </script>
 
 <template>
-  <AppMenu />
+  <AppNav :coins="hasCoins ? coins : null" />
 
   <main class="profile-page">
     <div class="profile-container">
@@ -284,7 +284,7 @@ watch(
           🌷 Keep going! You're doing great!
         </p>
       </section>
-      <button type="button" class="btn-cta mt-2 d-md-none d-block" @click="onSignOut">
+      <button type="button" class="btn-cta mt-2 d-block" @click="onSignOut">
         <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
         <span>Sign Out</span>
       </button>
@@ -295,8 +295,8 @@ watch(
 <style scoped>
 .profile-page {
   min-height: 100vh;
-  margin-left: 250px;
-  padding: 40px 24px 60px;
+  margin-left: 0;                 /* was 250px, room for the old sidebar */
+  padding: 100px 24px 60px;       /* top: room for the nav at the top-right */
   background: var(--bg, #fbf5e6);
   color: var(--ink, #2a2018);
   font-family: 'Nunito Sans', sans-serif;

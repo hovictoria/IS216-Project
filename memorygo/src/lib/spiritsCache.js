@@ -11,3 +11,4 @@ let saved = null
 
 export const rememberSpirits = (data) => { saved = data }
 export const savedSpirits = () => saved
+export const forgetSpirits = () => { saved = null }       // a new Spirit was found: ask the server next time

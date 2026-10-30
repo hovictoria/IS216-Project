@@ -21,6 +21,7 @@ import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { api } from '@/lib/api'
 import { distanceM, distanceLabel } from '@/lib/geo'
 import { useSpeech } from '@/lib/useSpeech'
+import { greeting } from '@/lib/useMood'           // Good morning / afternoon / evening
 
 const props = defineProps({
     places: { type: Array, default: () => [] },
@@ -37,7 +38,7 @@ const query = ref('')
 const open = ref(false)                  // dropdown: is the panel showing?
 const activeIndex = ref(-1)              // keyboard highlight
 
-const greeting = 'Good morning! Where to?'
+const placeholder = computed(() => `${greeting.value}! Where to?`)
 
 // ---------- MemoryGo places (instant) ----------
 // best matches first: name starts with what you typed, then a word starts with it, then anywhere in it
@@ -238,7 +239,7 @@ const distanceText = (m) => (props.knowsLocation ? distanceLabel(m).split(' · '
                     <circle cx="10.5" cy="10.5" r="6.5" />
                     <path d="M15.5 15.5 L20.5 20.5" />
                 </svg>
-                <input ref="inputEl" v-model="query" type="search" class="input" :placeholder="greeting"
+                <input ref="inputEl" v-model="query" type="search" class="input" :placeholder="placeholder"
                     autocomplete="off" enterkeyhint="search" aria-label="Search for a place"
                     role="combobox" aria-autocomplete="list" :aria-expanded="showPanel"
                     aria-controls="place-search-results"

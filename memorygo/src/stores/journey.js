@@ -8,7 +8,6 @@
 //               stops: the MemoryGo places on the way, in order: { id, name, lng, lat, radiusM, why }
 //               doneIds: stops already tapped in at, or skipped with "Not now"
 //             minimised = true while the trip runs in the background (normal map + "Resume" bar)
-//             demoPos = demo mode's pretend position (dev only), kept here so the demo carries on after a game
 // ----------------------------------------------------------------------------------------------------------
 
 import { ref, computed } from 'vue'
@@ -17,7 +16,6 @@ import { defineStore } from 'pinia'
 export const useJourneyStore = defineStore('journey', () => {
     const trip = ref(null)
     const minimised = ref(false)
-    const demoPos = ref(null)
 
     const active = computed(() => trip.value !== null)
     const showing = computed(() => active.value && !minimised.value)        // the journey screen is up
@@ -35,7 +33,6 @@ export const useJourneyStore = defineStore('journey', () => {
             startedAt: Date.now(),
         }
         minimised.value = false
-        demoPos.value = null
     }
 
     // went off route: swap in the new route from where you are, keeping the stops you've done
@@ -59,8 +56,7 @@ export const useJourneyStore = defineStore('journey', () => {
     function end() {
         trip.value = null
         minimised.value = false
-        demoPos.value = null
     }
 
-    return { trip, minimised, demoPos, active, showing, nextStop, start, replaceRoute, markDone, end }
+    return { trip, minimised, active, showing, nextStop, start, replaceRoute, markDone, end }
 })

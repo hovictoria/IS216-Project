@@ -15,6 +15,7 @@ purpose:    - one Spirit's page (/spirits/:id), opened from a tile on the Spirit
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import SpiritCanvas from '@/components/spirits/SpiritCanvas.vue'
+import PaperMap from '@/components/spirits/PaperMap.vue'
 import HandUnderline from '@/components/ui/HandUnderline.vue'
 import AppNav from '@/components/ui/AppNav.vue'
 import { GAME_LABELS } from '@/data/placeLabels'
@@ -116,7 +117,7 @@ async function share() {
         </div>
 
         <main v-else class="layout">
-            <!-- hero: the Spirit big, on peach, with a dashed ring and sparkles -->
+            <!-- hero: the Spirit big, on peach, standing on a faint paper map -->
             <section class="hero" :class="{ locked: !foundRow }">
                 <button type="button" class="back" aria-label="Back to all Spirits" @click="goBack">
                     <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
@@ -129,12 +130,7 @@ async function share() {
                     {{ spirit.rarity }}
                 </span>
 
-                <svg class="ring" viewBox="0 0 300 300" aria-hidden="true">
-                    <circle cx="150" cy="150" r="120" fill="none" stroke="#161412" stroke-opacity="0.15"
-                        stroke-width="2" stroke-dasharray="4 8" />
-                    <path d="M52 70 L55 79 L64 82 L55 85 L52 94 L49 85 L40 82 L49 79 Z M250 210 L252.5 217 L259.5 219.5 L252.5 222 L250 229 L247.5 222 L240.5 219.5 L247.5 217 Z M238 64 L240 69.5 L245.5 71.5 L240 73.5 L238 79 L236 73.5 L230.5 71.5 L236 69.5 Z"
-                        fill="#161412" />
-                </svg>
+                <PaperMap />
 
                 <div class="model">
                     <SpiritCanvas v-if="foundRow" :key="spirit.id" :spirit-id="spirit.id" :color="spirit.color" :label="spirit.name" />
@@ -261,6 +257,15 @@ async function share() {
     background: #E6E0D6;
 }
 
+/* not found yet: the paper map in greys to match */
+.hero.locked :deep(.paper-map) {
+    --map-river: #DCD6CC;
+    --map-road: #CFC8BC;
+    --map-block: #D8D1C6;
+    --map-park: #D3CFC0;
+    --map-route: #A39B90;
+}
+
 .back {
     position: absolute;
     top: 16px;
@@ -291,12 +296,6 @@ async function share() {
     font-weight: 800;
 }
 
-.ring {
-    position: absolute;
-    width: 300px;
-    height: 300px;
-}
-
 .model {
     position: relative;
     width: 280px;
@@ -321,7 +320,7 @@ async function share() {
 
 .name {
     margin: 0;
-    font-family: var(--font);          /* views/main.vue sets every h1 to Fraunces */
+    font-family: var(--font);          /* the app font (not the browser's heading font) */
     font-size: 60px;
     font-weight: 700;
     line-height: 0.95;
@@ -546,11 +545,6 @@ async function share() {
         height: 360px;
     }
 
-    .ring {
-        width: 420px;
-        height: 420px;
-    }
-
     .info {
         flex: 1;
         min-width: 0;
@@ -591,11 +585,6 @@ async function share() {
     .model {
         width: 420px;
         height: 420px;
-    }
-
-    .ring {
-        width: 460px;
-        height: 460px;
     }
 
     .name {

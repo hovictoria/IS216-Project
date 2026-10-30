@@ -32,7 +32,7 @@ import PlaceSearch from '@/components/map/PlaceSearch.vue'
 import RoutePanel from '@/components/map/RoutePanel.vue'
 import JourneyHud from '@/components/map/JourneyHud.vue'
 import { useJourneyStore } from '@/stores/journey'
-import { useJourney, useDemoWalk } from '@/lib/useJourney'
+import { useJourney } from '@/lib/useJourney'
 import AppNav from '@/components/ui/AppNav.vue'
 import CoinPill from '@/components/ui/CoinPill.vue'
 import HandUnderline from '@/components/ui/HandUnderline.vue'
@@ -273,6 +273,7 @@ function openPlace(place) {
         lat: place.lat,
         lng: place.lng,
         placeId: place.id,
+        spiritHidden: place.spiritHidden,
     }
     if (!isWide.value && detent.value === 'down') detent.value = 'middle'
 }
@@ -433,7 +434,6 @@ function onLocation(position) {
     if (!hasFix) {
         hasFix = true
         userMarker.addTo(map)
-        userDotOnMap = true
         if (!linkedPlace) {
             showNearby()
             selectNearest()
@@ -498,18 +498,11 @@ async function tapIn() {
 // card at the top shows the next stop. Inside a stop's zone for 20 s → "You've arrived" → Tap in.
 // The trip lives in a store, so it carries on after the game. Minimise = normal map with a Resume bar
 const journey = useJourneyStore()
-const demo = useDemoWalk(journey)
-const demoAllowed = import.meta.env.DEV        // demo mode only while running `pnpm run dev`
-const demoOn = ref(false)                     // the demo's pretend position is in use
-
-// where the journey thinks you are: demo mode's pretend position, or your real one
-const journeyPos = computed(() => (demoOn.value && demo.position.value ? demo.position.value : userPos.value))
-const trip = useJourney(journeyPos, journey)
+const trip = useJourney(userPos, journey)
 
 const hudTapping = ref(false)
 const hudMessage = ref('')
 const updatingRoute = ref(false)
-let userDotOnMap = false                      // the blue dot only goes on the map once we know where you are
 
 function startJourney({ mode, option }) {
     journey.start(destination.value, mode, option)
@@ -520,8 +513,6 @@ function startJourney({ mode, option }) {
 
 function endJourney() {
     journey.end()
-    demo.stop()
-    demoOn.value = false
     drawRoute(null)
     searchMarker?.remove()
     searchMarker = null
@@ -532,7 +523,7 @@ function endJourney() {
 function followYou() {
     if (!map || !journey.showing) return
     map.easeTo({
-        center: journeyPos.value,
+        center: userPos.value,
         zoom: 17,
         pitch: 60,
         bearing: trip.heading.value,
@@ -547,7 +538,7 @@ async function tapInAt(stop) {
     hudTapping.value = true
     hudMessage.value = ''
     try {
-        const [lng, lat] = journeyPos.value
+        const [lng, lat] = userPos.value
         const { data } = await api.post('/visits/start', { placeId: stop.id, lat, lng })
         trip.clearArrived()                   // this stop is done; the next one shows after the game
         router.push({ path: `/games/${data.game}`, query: { visit: data.visitId, paid: data.paid ? '1' : '0' } })
@@ -568,7 +559,7 @@ async function updateRoute() {
     if (updatingRoute.value || !journey.trip) return
     updatingRoute.value = true
     try {
-        const [lng, lat] = journeyPos.value
+        const [lng, lat] = userPos.value
         const { destination: dest, mode } = journey.trip
         const { data } = await api.get('/route', {
             params: { from: `${lat},${lng}`, to: `${dest.lat},${dest.lng}`, mode, name: dest.name },
@@ -583,26 +574,8 @@ async function updateRoute() {
     }
 }
 
-function toggleDemo() {
-    if (demo.running.value) {
-        demo.stop()
-        return
-    }
-    demoOn.value = true
-    demo.start(journeyPos.value)
-}
-
-// the blue dot follows the demo's pretend position too
-watch(journeyPos, (pos) => {
-    if (!userMarker || !pos) return
-    userMarker.setLngLat(pos)
-    if (demoOn.value && !userDotOnMap && map) {
-        userMarker.addTo(map)
-        userDotOnMap = true
-    }
-    if (demoOn.value) journey.demoPos = pos
-    followYou()
-})
+// during a trip the map follows you as you move
+watch(userPos, () => followYou())
 
 // opening / minimising the journey: tilt in, or settle back to the normal map
 watch(() => journey.showing, (showing) => {
@@ -616,6 +589,11 @@ function selectNearest() {
     selectedId.value = visiblePlaces.value[0]?.place.id ?? null
 }
 
+function placeState(place) {
+    if (place.spiritHidden) return 'undiscovered'
+    return place.visited ? 'collected' : 'playable'
+}
+
 // Ask our server for the places. Markers appear by themselves: places → pinPlaces → refreshMarkers
 async function loadPlaces() {
     placesStatus.value = 'loading'
@@ -624,9 +602,10 @@ async function loadPlaces() {
         if (!map) return                     // they left the page while we were waiting
 
         // The server says which places THIS user has played (visits table):
-        // ever played → 'collected' (green pin, sage card, for good); otherwise 'playable'.
+        // a Spirit they haven't found hides here → 'undiscovered' (chest pin, dark card) until their first
+        // paid game here finds it; ever played → 'collected' (green pin, sage card, for good); otherwise 'playable'.
         // place.playedToday decides the card label ("Played today · back tomorrow")
-        places.value = data.places.map((place) => ({ ...place, state: place.visited ? 'collected' : 'playable' }))
+        places.value = data.places.map((place) => ({ ...place, state: placeState(place) }))
         placesStatus.value = 'ready'
 
         // "Show on map" from a Spirit's page (/map?place=12): open that place instead of the nearest one
@@ -659,6 +638,13 @@ onMounted(() => {
         attributionControl: { compact: true },
     })
     map.setPadding(mapPadding())
+
+    // night look: a deep blue tint right above the map picture (shown by styles/night.css after 7 pm),
+    // below the blue dot and the tap areas
+    const nightTint = document.createElement('div')
+    nightTint.className = 'night-tint'
+    map.getCanvas().after(nightTint)
+
     showNearby()
     onMapMoved()
     map.on('moveend', onMapMoved)
@@ -709,10 +695,6 @@ onMounted(() => {
         // back from a game in the middle of a journey: draw it again and carry on
         if (journey.active) {
             drawRoute(journey.trip.option)
-            if (journey.demoPos && demoAllowed) {
-                demoOn.value = true
-                demo.start(journey.demoPos)
-            }
             followYou()
         }
     })
@@ -772,9 +754,10 @@ watch([detent, isWide], () => map?.easeTo({ padding: mapPadding(), duration: 340
             :arrived="trip.arrived.value" :reached-end="trip.reachedEnd.value" :off-route="trip.offRoute.value"
             :progress="trip.progress.value" :minutes-left="trip.minutesLeft.value"
             :next-stop-metres="trip.nextStopMetres.value" :tapping="hudTapping" :message="hudMessage"
-            :demo-allowed="demoAllowed" :demo-running="demo.running.value" :updating="updatingRoute"
+            :updating="updatingRoute"
+            :spirit-here="!!places.find((p) => p.id === trip.arrived.value?.id)?.spiritHidden"
             @tap-in="tapInAt" @skip="skipStop" @update-route="updateRoute" @end="endJourney"
-            @minimise="journey.minimised = true" @demo="toggleDemo" />
+            @minimise="journey.minimised = true" />
 
         <!-- phone only: search + coins along the top -->
         <div v-if="!journey.showing" class="topbar">
@@ -1295,7 +1278,7 @@ watch([detent, isWide], () => map?.easeTo({ padding: mapPadding(), duration: 340
 
 .near-title {
     margin: 0;
-    font-family: var(--font);     /* views/main.vue sets every h1 to Fraunces; override it */
+    font-family: var(--font);     /* the app font (not the browser's heading font) */
     font-size: 34px;
     font-weight: 700;
     line-height: 0.95;
@@ -1439,7 +1422,7 @@ watch([detent, isWide], () => map?.easeTo({ padding: mapPadding(), duration: 340
         margin-bottom: 22px;
     }
 
-    /* not called .brand: views/main.vue gives every .brand the Fraunces font */
+    /* the sidebar's logo + name */
     .sidebar-brand {
         display: flex;
         align-items: center;

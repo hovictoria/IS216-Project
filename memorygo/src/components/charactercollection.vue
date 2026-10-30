@@ -309,7 +309,7 @@ onMounted(async () => {
 
 .title {
     margin: 6px 0 20px;
-    font-family: var(--font);          /* views/main.vue sets every h1 to Fraunces */
+    font-family: var(--font);          /* the app font (not the browser's heading font) */
     font-size: 52px;
     font-weight: 700;
     line-height: 1;

@@ -255,7 +255,77 @@ Spirits (design: `~/Downloads/MemoryGo-spirits-handoff 2`, 24 Spirits in 6 area 
             - AppNav: a page under a tab (/spirits/kopi) keeps that tab highlighted
             - ChestCanvas skips drawing while hidden (the phone set card is hidden on laptop)
             - not built: "Memory match · 9 moves" (scores aren't saved per find), "1 game away" chips
-- [ ] S7: "You found a Spirit!" reveal · S8: chest pins · S9: full test
+- [x] S7: "You found a Spirit!" reveal
+      - the friend's unused `components/SpiritFound.vue` popup, redone in the new design; her logic kept (props
+        `spirit`, emit `close`, focus on Close, Esc / click outside closes, Teleport + pop transition)
+      - peach top with the live 3D Spirit (`SpiritCanvas`), "You found a Spirit!", rarity · set, name, lore;
+        `setDone` adds a butter "Civic District set complete! +50 coins" row with the 3D chest;
+        "See my Spirit" (→ /spirits/:id) and "Close"
+      - shown from `LevelUpNotice.vue` (already on all 6 game pages), so no game page changed. The Spirit comes
+        first; the level-up card waits until it's closed
+      - `lib/gamereward.js`: a found Spirit clears `lib/spiritsCache.js` so the Spirit page asks the server again
+      - checked: game opened with ?visit=1 + pretend finish answer → popup on phone and laptop, See my Spirit opens
+        Kopi as found, Esc closes
+- [x] S8: chest pins
+      - `views/map.vue` `placeState()`: `spiritHidden` → 'undiscovered' (chest pin, white zone, dark card); after
+        the first paid game there the Spirit is found and it's a green "Been here" pin next time the map loads
+      - PlaceCard tag "Spirit hiding here" (phone cards; the sidebar card shows it by its dark colour)
+      - place preview (RoutePanel): peach "A Spirit is hiding here. Play a game here to find it." with the 3D chest
+      - arrived card (JourneyHud, prop `spiritHere`): "A Spirit is hiding here. Your game will find it."
+      - checked on the map with pretend places: 1 chest + 2 pins, preview hint, dark card
+- [ ] S9: full test (real account, real tap-in at a Spirit place)
+- [x] Day / night look + demo walk removed (2026-10-30)
+      - `lib/useMood.js`: night = 7 pm to 6 am on the device clock → class="night" on <html>. The clock is checked
+        when the app opens and on every page change (`checkMood()` in router/index.js beforeEach): no timer running
+        in the background. Tested with a fake clock: 6:59 → 7:01 pm switches on the next page change.
+        `?mood=night` / `?mood=day` previews either look (remembered in this browser), `?mood=auto` = clock again.
+        Also exports `greeting` (Good morning / afternoon / evening; evening whenever it's night), used by the
+        map search bar, the search panel placeholder and the Journey greeting
+      - `styles/night.css` (all night rules in one file, every rule starts with html.night): landing / sign in /
+        sign up = night sky #1C2140 + stars (SkyBackdrop .stars) + pale moon + island dimmed (brightness .68,
+        saturate .85), light text on the sky, paper sheet stays dark text; map = deep blue tint
+        rgba(22,30,76,.64) multiply right above the map picture (`.night-tint` added in views/map.vue, under the blue
+        dot); Journey + Spirits tabs = darker blurred map, indigo #5B4BB5 + blue #2F6FB0 glows, light headings,
+        glass cards ~80% solid. Spirit page, Me page and game pages keep the light paper look. Haze still dropped
+      - demo walk removed: `useDemoWalk` + `pointAt` (lib/useJourney.js), `demoPos` (stores/journey.js), the
+        "Demo: walk the route" button + props (JourneyHud.vue), and demo wiring in views/map.vue (the journey now
+        uses the real location only)
+- [x] Old pages removed, Me page on the new nav (2026-10-30)
+      - `views/profile.vue` is the FRIEND'S page and keeps her design + code (the user asked: nav only).
+        Changed 5 lines: `AppMenu` → `AppNav`; margin-left 250px → 0 and top padding 100px (no sidebar now,
+        room for the nav pill); Sign out shows on every screen (was phone-only because the old sidebar had it)
+      - `styles/legacy.css` (loaded in main.js): the bits her page used from the deleted dashboard, limited to
+        `.profile-page`: Fraunces / Nunito Sans fonts, serif h1/h2, the orange `.btn-cta` Sign out button
+      - note: her "Stations completed" still reads the old map's browser storage, so it shows 0 / 6
+      - deleted: `views/main.vue` (old /menu dashboard), `components/menu.vue` (old sidebar navbar),
+        `components/games/games.vue` (unused old games navbar). `/menu` now redirects to `/journey`
+      - main.vue also set global fonts/colours (Fraunces h1/h2 etc.): the game pages set their own colours + serif
+        headings, the new pages their own font, and the Me page's bits moved to styles/legacy.css. Old
+        "views/main.vue sets every h1 to Fraunces" comments updated
+- [x] Spirit backgrounds (2026-10-30): the dashed ring + sparkles behind the Spirit looked AI-made, so they're gone.
+      Options were mocked on the real page (paper map / real map of the place / plain peach); the user picked the
+      paper map. `components/spirits/PaperMap.vue` = the landing page's paper map style (river, roads, blocks,
+      parks, dotted route to a pin) recoloured for peach, faded at the edges; colours are CSS variables, so the
+      "not found yet" page uses greys. Used on the Spirit page hero and the "You found a Spirit!" popup
+- [ ] Journey tab (built, waiting on `docs/journey.sql` + a real test)
+      - decisions (2026-10-30): today's challenge = finish paid games at 2 places today → +50 coins once a day;
+        Puzzle of the day = one of our 6 games (same for everyone, turns each day) paying the game's coins + 20
+        bonus on the first finish that day; "km walked" → "places played this week" (no location saved, PDPA);
+        practice ("Play anytime" / old games menu) = 0 coins, 0 XP, doesn't tick "This week"
+      - `docs/journey.sql` (TO RUN): `daily_rewards` (user, Singapore date, kind puzzle|challenge; one per day per
+        kind) + `claim_daily()` that saves it and adds coins/XP in one step; server-only like the other tables
+      - server: `routes/journey.js` GET /api/journey (coins, week, daysThisWeek, placesThisWeek, spiritsFound,
+        puzzle { game, bonus, done }, challenge { goal, done, bonus, claimed }) and POST /api/journey/puzzle/finish;
+        `visits.js` finish pays the challenge after a paid game (`payChallengeIfDone`, answer has `challenge`);
+        `streak.js` /xp = practice: earned 0, no streak tick (same answer shape, + `practice: true`)
+      - `lib/gamereward.js`: `?puzzle=1` → /journey/puzzle/finish
+      - `views/journey.vue` at /journey (AppNav's Journey now points here; the old /menu dashboard is untouched):
+        greeting, "Your journey", 3D island top-right, trip in progress + Resume, challenge (ring, 3D chest,
+        hours left, Find spots near me), Puzzle of the day (Play / Done today + Play again), This week dots,
+        places this week, Spirits found (→ Spirits tab), Play anytime: our 6 games, tinted tiles
+      - layouts: phone 2 columns; iPad 2 columns wider; laptop (1024+) 4-column bento with grid areas
+        (trip | puzzle | week / challenge | places | spirits; challenge moves up when there's no trip), games 6 across
+      - not built: personal bests on game tiles; the game pages still say "You earned 0 XP and 0 coins" for practice
 - [x] Step 7: OneMap account + search with a dropdown + microphone
   - `server/lib/onemap.js`: logs in with ONEMAP_EMAIL / ONEMAP_PASSWORD, keeps the token in memory, renews it
     an hour before it expires (or when OneMap rejects it). `searchOneMap(text)` → { name, address, postal, lat, lng }

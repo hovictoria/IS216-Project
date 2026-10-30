@@ -3,7 +3,7 @@ PSEUDOCODE
 filename:   components/map/PlaceCard.vue
 purpose:    - one place in the "Near you" list (DESIGN_SPEC.md section 5, "Place card")
             - colour by type/state: peach = playable spot, MRT = a soft tint of its line colour (blended
-              for interchanges; butter if the line is unknown), sage = Spirit collected, dark = undiscovered
+              for interchanges; butter if the line is unknown), sage = played here, dark = a Spirit you haven't found hides here (chest pin on the map)
             - layout="rail":    300 x 250 card, swiped sideways on phones (sheet in the middle)
             - layout="stacked": same card but full width, for the phone list when the sheet is up
             - layout="compact": shorter card for the iPad / laptop sidebar
@@ -49,7 +49,7 @@ const rewardLabel = computed(() => {
 // the outlined tag above the title
 const tagLabel = computed(() => {
     if (props.place.state === 'collected') return 'Been here'       // "Spirit collected" once Spirits drop from visits
-    if (props.place.state === 'undiscovered') return 'Undiscovered'
+    if (props.place.state === 'undiscovered') return 'Spirit hiding here'
     if (isMrt.value) return 'MRT station'
     return 'Surprise game'          // the game is picked at random when you tap in (server/routes/visits.js)
 })

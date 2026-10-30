@@ -20,6 +20,7 @@ import { Router } from 'express'
 import { requireAuth } from '../middleware/auth.js'
 import { supabase } from '../supabase.js'
 import { GAMES, XP, COINS, rewardFor, singaporeToday, recordPlay } from './streak.js'
+import { payChallengeIfDone } from './journey.js'
 
 const router = Router()
 
@@ -28,10 +29,10 @@ const FINISH_MINUTES = 30        // a paid visit must be finished within this lo
 
 // Our 6 games. Which one you play is picked at random each time you tap in (never the same game as your
 // last visit to that place), so a place you pass every day doesn't always give the same game
-const ALL_GAMES = ['memory', 'object', 'sequence', 'pattern', 'missing', 'oddoneout']
+export const ALL_GAMES = ['memory', 'object', 'sequence', 'pattern', 'missing', 'oddoneout']
 
 // visits.game → the game names the reward formula in streak.js uses
-const SCORING_NAME = {
+export const SCORING_NAME = {
     memory: 'memory',
     object: 'object-id',
     sequence: 'sequence',
@@ -228,8 +229,13 @@ router.post('/:id/finish', requireAuth, async (req, res) => {
             return res.status(409).json({ message: 'This game has already been saved.' })
         }
 
-        // 4. A paid game also counts towards the streak and "this week"
-        if (paidOut.coins_earned > 0) await recordPlay(userId)
+        // 4. A paid game also counts towards the streak and "this week", and maybe finishes today's challenge
+        //    (2 places today → +50 coins once, routes/journey.js)
+        let challenge = null
+        if (paidOut.coins_earned > 0) {
+            await recordPlay(userId)
+            challenge = await payChallengeIfDone(userId)
+        }
 
         // 5. finish_visit also found this place's Spirit (first paid game here) and maybe finished a set:
         //    send its details so the game can show "You found a Spirit!"
@@ -246,7 +252,8 @@ router.post('/:id/finish', requireAuth, async (req, res) => {
         res.json({
             paid: paidOut.coins_earned > 0,
             earned: { coins: paidOut.coins_earned, xp: paidOut.xp_earned },
-            totals: { coins: paidOut.total_coins, xp: paidOut.total_xp },
+            totals: challenge?.totals ?? { coins: paidOut.total_coins, xp: paidOut.total_xp },
+            challenge: challenge ? { bonus: challenge.coins } : null,      // today's challenge just finished
             spirit,                                                    // null, or the Spirit just found
             setDone: paidOut.set_done ? { name: paidOut.set_done, bonus: paidOut.set_bonus } : null,
         })

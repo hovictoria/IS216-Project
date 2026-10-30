@@ -10,7 +10,7 @@ purpose:    - what the sheet (phone) / sidebar (iPad, laptop) shows after you pi
             - directions come from our server: GET /api/route (OneMap routing, server/routes/route.js)
             - "Start journey" starts the live journey (stores/journey.js, JourneyHud.vue). It needs your real
               location, except while running `pnpm run dev` (demo mode can walk the route for you)
-props:      destination { name, sub, fact, url, lat, lng, placeId? }, userPos ([lng, lat]), knowsLocation
+props:      destination { name, sub, fact, url, lat, lng, placeId?, spiritHidden? }, userPos ([lng, lat]), knowsLocation
 emits:      close, show-route (the chosen option, or null → the map draws it / clears it),
             start { mode, option } (Start journey),
             focus (an { lng, lat } to centre on, when a step or stop is tapped)
@@ -22,6 +22,7 @@ import { api } from '@/lib/api'
 import { distanceM, distanceLabel } from '@/lib/geo'
 import { MRT_LINE_NAMES, lineColour } from '@/data/placeLabels'
 import PrimaryButton from '@/components/ui/PrimaryButton.vue'
+import ChestCanvas from '@/components/ui/ChestCanvas.vue'
 
 const props = defineProps({
     destination: { type: Object, required: true },
@@ -123,6 +124,10 @@ const WHY = { 'get on': 'Get on here', 'get off': 'Get off here', 'walk past': '
 
         <!-- ================= Preview ================= -->
         <template v-if="stage === 'preview'">
+            <p v-if="destination.spiritHidden" class="spirit-hint">
+                <ChestCanvas class="spirit-hint-chest" />
+                <span><strong>A Spirit is hiding here.</strong> Play a game here to find it.</span>
+            </p>
             <p v-if="destination.fact" class="fact">{{ destination.fact }}</p>
             <a v-if="destination.url" class="read-more" :href="destination.url" target="_blank" rel="noopener">
                 Read more on Roots.sg
@@ -257,7 +262,7 @@ const WHY = { 'get on': 'Get on here', 'get off': 'Get off here', 'walk past': '
 
 .title {
     margin: 2px 0 4px;
-    font-family: var(--font);           /* views/main.vue sets every h2 to Fraunces */
+    font-family: var(--font);           /* the app font (not the browser's heading font) */
     font-size: 30px;
     font-weight: 700;
     line-height: 1.05;
@@ -290,6 +295,25 @@ const WHY = { 'get on': 'Get on here', 'get off': 'Get off here', 'walk past': '
 }
 
 /* ---------- preview ---------- */
+/* "A Spirit is hiding here" (places with a Spirit the user hasn't found) */
+.spirit-hint {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0;
+    padding: 10px 14px 10px 8px;
+    border-radius: 20px;
+    background: rgba(246, 196, 164, 0.55);
+    font-size: 17px;
+    line-height: 1.35;
+}
+
+.spirit-hint-chest {
+    flex-shrink: 0;
+    width: 52px;
+    height: 52px;
+}
+
 .fact {
     margin: 0;
     font-size: 17px;

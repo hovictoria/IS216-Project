@@ -8,11 +8,10 @@ purpose:    - the live journey screen on top of the map (prototype 10-Journey, 1
                 off route   "You're off the route" with Update route
                 reached end "You've arrived at <destination>" with Finish
             - bottom: "To <destination> · 16 min left", progress bar, End journey (asks first), minimise
-            - demo mode button (only shown while running `pnpm run dev`, see views/map.vue)
 props:      trip, nextStop, arrived, reachedEnd, offRoute, progress, minutesLeft, nextStopMetres,
             tapping (a tap in is starting), message (the server's reason if tapping in failed),
-            demoAllowed, demoRunning, updating (a new route is loading)
-emits:      tap-in(stop), skip, update-route, end, minimise, demo
+            updating (a new route is loading)
+emits:      tap-in(stop), skip, update-route, end, minimise
 ---------------------------------------------------------------------------------------------------------->
 
 <script setup>
@@ -31,11 +30,10 @@ const props = defineProps({
     nextStopMetres: { type: Number, default: null },
     tapping: { type: Boolean, default: false },
     message: { type: String, default: '' },
-    demoAllowed: { type: Boolean, default: false },
-    demoRunning: { type: Boolean, default: false },
     updating: { type: Boolean, default: false },
+    spiritHere: { type: Boolean, default: false },      // the arrived stop hides a Spirit they haven't found
 })
-const emit = defineEmits(['tap-in', 'skip', 'update-route', 'end', 'minimise', 'demo'])
+const emit = defineEmits(['tap-in', 'skip', 'update-route', 'end', 'minimise'])
 
 const confirming = ref(false)            // the "End this trip?" question is showing
 
@@ -60,6 +58,7 @@ const isDone = (stop) => props.trip.doneIds.includes(stop.id)
                 <p class="eyebrow"><span class="live"></span>You’ve arrived</p>
                 <h2 class="name">{{ arrived.name }}</h2>
                 <p class="sub">Play a short game here. Stop walking first.</p>
+                <p v-if="spiritHere" class="spirit-note">A Spirit is hiding here. Your game will find it.</p>
                 <div class="actions">
                     <PrimaryButton class="tap-in" :disabled="tapping" @click="emit('tap-in', arrived)">
                         {{ tapping ? 'Tapping in…' : 'Tap in' }}
@@ -121,9 +120,6 @@ const isDone = (stop) => props.trip.doneIds.includes(stop.id)
 
             <div class="bottom-actions">
                 <button type="button" class="end" @click="confirming = true">End journey</button>
-                <button v-if="demoAllowed" type="button" class="demo" @click="emit('demo')">
-                    {{ demoRunning ? 'Stop demo' : 'Demo: walk the route' }}
-                </button>
             </div>
         </div>
 
@@ -242,7 +238,7 @@ const isDone = (stop) => props.trip.doneIds.includes(stop.id)
 
 .name {
     margin: 0;
-    font-family: var(--font);           /* views/main.vue sets every h2 to Fraunces */
+    font-family: var(--font);           /* the app font (not the browser's heading font) */
     font-size: 28px;
     font-weight: 700;
     line-height: 1.05;
@@ -253,6 +249,13 @@ const isDone = (stop) => props.trip.doneIds.includes(stop.id)
     margin: 0;
     font-size: 17px;
     font-weight: 500;
+}
+
+.spirit-note {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--peach);
 }
 
 .actions {
@@ -399,17 +402,6 @@ const isDone = (stop) => props.trip.doneIds.includes(stop.id)
     background: var(--ink);
     color: var(--white);
     font: 700 18px var(--font);
-    cursor: pointer;
-}
-
-.demo {
-    min-height: var(--cta-height);
-    padding: 0 18px;
-    border: 2px dashed var(--muted);
-    border-radius: var(--radius-pill);
-    background: transparent;
-    color: var(--ink);
-    font: 700 16px var(--font);
     cursor: pointer;
 }
 

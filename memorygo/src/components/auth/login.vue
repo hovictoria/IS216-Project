@@ -89,7 +89,7 @@ imports:    AuthLayout.vue, ui/TextField.vue, ui/PrimaryButton.vue, ui/HandUnder
 
     .heading {
         margin: 0;
-        font-family: var(--font);   /* views/main.vue sets every h1 to Fraunces; override it */
+        font-family: var(--font);   /* the app font (not the browser's heading font) */
         font-size: clamp(40px, 11vw, 56px);
         font-weight: 700;
         line-height: 0.95;

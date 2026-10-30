@@ -6,7 +6,7 @@ purpose:    - the main navigation: Map, Spirits, Journey, Me
             - iPad / laptop:    glass pill at the top-right with text tabs, the coin pill and an avatar
             - router-link adds the class "router-link-active" to the current tab; we style that black
 props:      coins (shown in the top bar on big screens)
-note:       Journey points to /menu for now (the old dashboard). It becomes the Journey tab later
+note:       Journey points to the Journey tab (views/journey.vue); the old /menu dashboard was removed
 ---------------------------------------------------------------------------------------------------------->
 
 <script setup>
@@ -44,7 +44,7 @@ const tabs = [
         icon: 'M12 3 L14 10 L21 12 L14 14 L12 21 L10 14 L3 12 L10 10 Z',
     },
     {
-        to: '/menu',
+        to: '/journey',
         label: 'Journey',
         icon: 'M8.5 18 H15 A3.5 3.5 0 0 0 15 11 H9 A3.5 3.5 0 0 1 9 4 H15.5 M6 15.5 A2.5 2.5 0 1 0 6 20.5 A2.5 2.5 0 1 0 6 15.5 M18 3.5 A2.5 2.5 0 1 0 18 8.5 A2.5 2.5 0 1 0 18 3.5',
     },

@@ -1,0 +1,51 @@
+/* ----------------------------------------------------------------------------------------------------------
+PSEUDOCODE
+filename:   styles/legacy.css
+purpose:    - the styles the Me page (views/profile.vue) used from the old dashboard (views/main.vue), which was
+              removed along with the old sidebar menu: its fonts, serif headings and the orange Sign out button
+            - copied as they were, but limited to the Me page (.profile-page) so they don't change other pages
+imports:    loaded once in main.js
+---------------------------------------------------------------------------------------------------------- */
+
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Nunito+Sans:wght@400;600;700;800&display=swap");
+
+.profile-page h1,
+.profile-page h2 {
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 700;
+    color: #2a2018;
+}
+
+/* Primary call-to-action (the Sign out button) */
+.profile-page .btn-cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    width: 100%;
+    max-width: 28rem;
+    background: #a64f31;
+    color: #fff;
+    border: 0;
+    border-radius: 16px;
+    padding: 1.05rem 2rem;
+    font-size: 1.25rem;
+    font-weight: 800;
+    box-shadow: 0 5px 0 #7d3a22;
+    transition: transform 0.08s, box-shadow 0.08s;
+}
+
+.profile-page .btn-cta:hover {
+    background: #b55737;
+}
+
+.profile-page .btn-cta:active {
+    transform: translateY(3px);
+    box-shadow: 0 2px 0 #7d3a22;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .profile-page .btn-cta {
+        transition: none;
+    }
+}

@@ -11,9 +11,6 @@
 //             - heading     the direction of the route where you are, so the map can turn to face it
 //             - keeps the phone screen awake during the trip (Wake Lock API, where supported): a web page
 //               can't follow you with the screen off
-//           useDemoWalk(): DEMO MODE for presentations / testing at home. Moves a pretend you along the route,
-//           and waits inside each stop's zone until you tap in or press "Not now". Only offered while running
-//           `pnpm run dev` (see views/map.vue), because tap-in trusts the location the page sends
 // ----------------------------------------------------------------------------------------------------------
 
 import { ref, computed, watch, onUnmounted } from 'vue'
@@ -61,20 +58,8 @@ function locate(line, [lng, lat]) {
     return best
 }
 
-// the point a given distance along the line (used by demo mode)
-function pointAt(line, metres) {
-    const d = Math.max(0, Math.min(line.total, metres))
-    let i = 1
-    while (i < line.along.length - 1 && line.along[i] < d) i++
-    const span = line.along[i] - line.along[i - 1] || 1
-    const t = (d - line.along[i - 1]) / span
-    const [ax, ay] = line.points[i - 1]
-    const [bx, by] = line.points[i]
-    return [ax + (bx - ax) * t, ay + (by - ay) * t]
-}
-
 // ---------- The live journey ----------
-// position: a ref of [lng, lat] (real location, or demo mode's); journey: the store
+// position: a ref of [lng, lat] (your real location); journey: the store
 export function useJourney(position, journey) {
     const line = computed(() => (journey.trip ? buildLine(journey.trip.option) : null))
     const here = computed(() => (line.value && position.value ? locate(line.value, position.value) : null))
@@ -167,62 +152,4 @@ export function useJourney(position, journey) {
     })
 
     return { progress, heading, minutesLeft, nextStopMetres, reachedEnd, arrived, offRoute, clearArrived, resetOffRoute }
-}
-
-// ---------- Demo mode ----------
-// Moves a pretend position along the trip's route (~1 minute end to end, at least 15 m/s), stopping at the
-// point of the route nearest each stop until it's done (so the 20 s arrival, Tap in and Not now can be shown)
-export function useDemoWalk(journey) {
-    const position = ref(null)
-    const running = ref(false)
-    let metres = 0
-    let timer = null
-
-    function tick() {
-        const trip = journey.trip
-        if (!trip) return stop()
-        const line = buildLine(trip.option)
-
-        // the point on the route closest to the next stop: always inside its zone (that's how the server
-        // picked it), so the demo waits there until the stop is tapped in at or skipped
-        const next = journey.nextStop
-        const waitAt = next ? locate(line, [next.lng, next.lat]).along : Infinity
-
-        const speed = Math.max(15, line.total / 60)            // metres per second
-        metres = Math.min(line.total, metres + speed / 4, waitAt)   // 4 ticks a second
-        position.value = pointAt(line, metres)
-
-        // waiting for a stop that the route only passes at the very edge of its zone: step a little towards
-        // it (at most 35 m, well under the 40 m that counts as off route) so the demo is clearly inside
-        if (next && metres === waitAt) {
-            const away = distanceM(position.value, [next.lng, next.lat])
-            const step = Math.min(35, Math.max(0, away - (next.radiusM - 15)))
-            if (step > 0) {
-                const f = step / away
-                const [x, y] = position.value
-                position.value = [x + (next.lng - x) * f, y + (next.lat - y) * f]
-            }
-        }
-        if (metres >= line.total) stop()
-    }
-
-    function start(fromPosition) {
-        const trip = journey.trip
-        if (!trip) return
-        const line = buildLine(trip.option)
-        metres = fromPosition ? locate(line, fromPosition).along : 0
-        position.value = pointAt(line, metres)
-        running.value = true
-        clearInterval(timer)
-        timer = setInterval(tick, 250)
-    }
-
-    function stop() {
-        clearInterval(timer)
-        timer = null
-        running.value = false
-    }
-
-    onUnmounted(stop)
-    return { position, running, start, stop }
 }

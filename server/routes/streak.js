@@ -39,7 +39,7 @@ export function singaporeToday() {
 }
 
 // Add (or subtract) days
-function addDays(dateStr, days) {
+export function addDays(dateStr, days) {
     const d = new Date(`${dateStr}T00:00:00Z`)
     d.setUTCDate(d.getUTCDate() + days)
     return d.toISOString().slice(0, 10)
@@ -51,7 +51,7 @@ function weekdayIndex(dateStr) {
 }
 
 // The Monday of the week that contains dateStr
-function mondayOf(dateStr) {
+export function mondayOf(dateStr) {
     return addDays(dateStr, -weekdayIndex(dateStr))
 }
 
@@ -59,7 +59,7 @@ function mondayOf(dateStr) {
 
 // Turns a stored row into what the page needs.
 // Stored values can be out of date, so check them against today.
-function buildStatus(progress) {
+export function buildStatus(progress) {
     const today = singaporeToday()
     const yesterday = addDays(today, -1)
     const monday = mondayOf(today)
@@ -164,6 +164,10 @@ router.post('/init', requireAuth, async (req, res) => {
 
 
 // POST /api/progress/xp → body: { game, score? | moves? | level? }
+// Practice ("Play anytime" on the Journey tab, or any game not opened from a place or the Puzzle of the day):
+// no coins, no XP, and it doesn't tick "This week" (decided for the Journey tab). Coins come from playing at
+// places (/api/visits), the Puzzle of the day and today's challenge (/api/journey). The answer keeps the same
+// shape so the game pages still work, with earned = 0
 router.post('/xp', requireAuth, async (req, res) => {
     const getFraction = GAMES[req.body?.game]
 
@@ -171,33 +175,27 @@ router.post('/xp', requireAuth, async (req, res) => {
         return res.status(400).json({ message: 'Unknown game.' })
     }
 
-    const fraction = getFraction(req.body)
-    const xpEarned = rewardFor(XP, fraction)
-    const coinsEarned = rewardFor(COINS, fraction)
+    const xpEarned = 0
+    const coinsEarned = 0
 
     try {
-        // Update the streak first. This also creates the user's row if they have none.
-        const status = await recordPlay(req.user.id)
+        await ensureProgress(req.user.id)                  // creates the user's row if they have none
 
         const { data: row, error } = await supabase
             .from(TABLE)
-            .select('xp, coins')
+            .select('xp, coins, streak, last_played, week_start, week_played')
             .eq('user_id', req.user.id)
             .single()
 
         if (error) throw error
 
-        const xp = (row.xp || 0) + xpEarned
-        const coins = (row.coins || 0) + coinsEarned
+        const status = buildStatus(row)                    // streak as it is (practice doesn't change it)
 
-        const { error: updateError } = await supabase
-            .from('progress')
-            .update({ xp, coins })
-            .eq('user_id', req.user.id)
-
-        if (updateError) throw updateError
+        const xp = row.xp || 0
+        const coins = row.coins || 0
 
         res.json({
+            practice: true,
             xp,
             coins,
             streak: status.streak,

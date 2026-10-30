@@ -5,12 +5,13 @@ purpose:    - the glass "Good morning! Where to?" bar at the top of the map on P
             - it's a button: tapping it opens the full-screen search (PlaceSearch variant="screen");
               tapping the mic opens it already listening
             - iPad / laptop use PlaceSearch variant="dropdown" in the sidebar instead (you type right in it)
-            - always "Good morning" for now (morning look first; night mode later)
+            - the greeting follows the time of day (lib/useMood.js): Good morning / afternoon / evening
 emits:      open (tapped the bar), mic (tapped the microphone)
 ---------------------------------------------------------------------------------------------------------->
 
 <script setup>
-const greeting = 'Good morning'
+import { greeting } from '@/lib/useMood'           // Good morning / afternoon / evening
+
 defineEmits(['open', 'mic'])
 
 // hide the mic where the browser can't listen (Firefox, or not https / localhost)

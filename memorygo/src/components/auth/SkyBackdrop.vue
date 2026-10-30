@@ -21,6 +21,8 @@ defineProps({
 <template>
     <div class="backdrop" :class="`on-${variant}`" aria-hidden="true">
         <div class="glow"></div>
+        <!-- small stars, only shown at night (styles/night.css) -->
+        <div class="stars"></div>
 
         <svg class="map-lines" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
             <!-- river -->
@@ -91,6 +93,29 @@ defineProps({
             radial-gradient(ellipse 35% 55% at 25% 50%, rgba(255, 238, 200, 0.95), rgba(255, 238, 200, 0) 70%),
             linear-gradient(180deg, #F8EFD9 0%, #F4E7C8 45%, #EFD8B4 100%);
     }
+}
+
+/* ---------- stars (night only, styles/night.css shows them) ---------- */
+.stars {
+    display: none;
+    position: absolute;
+    inset: 0 0 40% 0;
+    background-image:
+        radial-gradient(1.5px 1.5px at 8% 12%, #fff 50%, transparent 51%),
+        radial-gradient(1px 1px at 18% 30%, #fff 50%, transparent 51%),
+        radial-gradient(1.5px 1.5px at 27% 8%, #fff 50%, transparent 51%),
+        radial-gradient(1px 1px at 36% 22%, #fff 50%, transparent 51%),
+        radial-gradient(2px 2px at 47% 6%, #fff 50%, transparent 51%),
+        radial-gradient(1px 1px at 55% 28%, #fff 50%, transparent 51%),
+        radial-gradient(1.5px 1.5px at 64% 14%, #fff 50%, transparent 51%),
+        radial-gradient(1px 1px at 72% 4%, #fff 50%, transparent 51%),
+        radial-gradient(1.5px 1.5px at 81% 26%, #fff 50%, transparent 51%),
+        radial-gradient(1px 1px at 90% 10%, #fff 50%, transparent 51%),
+        radial-gradient(1px 1px at 95% 34%, #fff 50%, transparent 51%),
+        radial-gradient(1.5px 1.5px at 4% 40%, #fff 50%, transparent 51%),
+        radial-gradient(1px 1px at 42% 44%, #fff 50%, transparent 51%),
+        radial-gradient(1px 1px at 86% 48%, #fff 50%, transparent 51%);
+    opacity: 0.85;
 }
 
 /* ---------- 2. paper map ---------- */
