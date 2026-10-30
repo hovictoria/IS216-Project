@@ -9,20 +9,6 @@
 // imports:    imports supabase to use supabase methods. Imports defineStore from pinia
 // ----------------------------------------------------------------------------------------------------------
 
-// ----------------------------------------------------------------------------------------------------------
-// useAuthStore()
-//  1. const user
-//      - returns a Supabase user object [null when logged out]
-//  2. const isLoggedIn
-//      - a boolean variable to check if a user isLoggedIn
-//      - used in src/router/index.js to check if there is a protected guard for that page whenever the user switches page, 'to'
-//  3. function init()
-//      - function to check if user has a saved session
-//      - used in main.js before app runs to check if the user has a stored saved session within the browser
-//  4. function signIn()
-//      - function to signIn 
-//      - used in login.vue for user error validation during signIn
-// ----------------------------------------------------------------------------------------------------------
 
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
@@ -93,6 +79,35 @@ export const useAuthStore = defineStore('auth', () => {
         return "We couldn't save your new password. Please ask for a new reset link."
     }
 
+    // Edit profile: change the name shown around the app (saved on the user as display_name)
+    async function updateName(displayName) {
+        const { data, error } = await supabase.auth.updateUser({ data: { display_name: displayName } })
+        if (error) return "We couldn't save your name. Please try again."
+
+        user.value = data.user      // show the new name straight away
+        return null
+    }
+
+    // Edit profile: change password. Checks the current password first by signing in with it
+    async function changePassword(currentPassword, newPassword) {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+            email: user.value.email,
+            password: currentPassword,
+        })
+        if (signInError) return 'Your current password is not correct. Please try again.'
+
+        const { error } = await supabase.auth.updateUser({ password: newPassword })
+        if (!error) return null
+
+        if (error.message.toLowerCase().includes('different')) {
+            return 'Your new password must be different from your current one.'
+        }
+        if (error.message.toLowerCase().includes('password')) {
+            return 'Please choose a longer password (at least 6 characters).'
+        }
+        return "We couldn't change your password. Please try again."
+    }
+
     // Helps with the signOut
     async function signOut() {
         await supabase.auth.signOut()
@@ -111,5 +126,8 @@ export const useAuthStore = defineStore('auth', () => {
         })
     }
 
-    return { user, isLoggedIn, init, signIn, signUp, signOut, sendPasswordReset, updatePassword }
+    return {
+        user, isLoggedIn, init, signIn, signUp, signOut,
+        sendPasswordReset, updatePassword, updateName, changePassword
+    }
 })
