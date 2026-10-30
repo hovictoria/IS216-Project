@@ -6,13 +6,28 @@ import { stations } from '@/data/stations'
 import { levelFromXp, progressToNext } from '@/config/progression'
 import AppNav from '@/components/ui/AppNav.vue'   // the app's nav (the old sidebar menu was removed)
 import EditProfile from '@/components/profile/EditProfile.vue'
+import DeleteAccount from '@/components/profile/DeleteAccount.vue'
 import { useRouter } from "vue-router";
 
 const auth = useAuthStore()
 const router = useRouter();
 
-// Edit profile pop-up: opens when "Edit profile" is tapped
+// Edit profile pop-up
 const editing = ref(false)
+
+// Delete account pop-up
+const deleting = ref(false)
+
+function openDelete() {
+  editing.value = false
+  deleting.value = true
+}
+
+// "Keep my account" goes back to the Edit Profile pop-up they came from
+function closeDelete() {
+  deleting.value = false
+  editing.value = true
+}
 
 // Username
 const displayName = computed(() => {
@@ -187,7 +202,7 @@ watch(
       </section>
 
       <!-- edit name and password -->
-      <EditProfile v-if="editing" @close="editing = false" />
+      <EditProfile v-if="editing" @close="editing = false" @delete="openDelete" />
 
       <!-- level progress -->
       <section class="profile-card">
@@ -305,6 +320,8 @@ watch(
       </button>
     </div>
   </main>
+
+  <DeleteAccount v-if="deleting" @close="closeDelete" />
 </template>
 
 <style scoped>
@@ -406,6 +423,7 @@ watch(
 .edit-btn:hover {
   background: #f3f6fb;
 }
+
 
 .section-heading,
 .station-heading {

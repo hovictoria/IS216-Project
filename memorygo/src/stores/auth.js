@@ -6,6 +6,7 @@
 //             3. function init     = restores a saved session on startup and then keeps user updated for rest of the app's life through a listener
 //             4. function signIn   = helps with signin. Sends email and password variables to Supabase and reports back
 //             5. function sendPasswordReset / updatePassword = forgot password: email a reset link, then save the new password
+//             6. function deleteAccount = checks the password, then asks the server (DELETE /api/me) to delete the account
 // imports:    imports supabase to use supabase methods. Imports defineStore from pinia
 // ----------------------------------------------------------------------------------------------------------
 
@@ -13,6 +14,7 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { supabase } from '@/lib/supabase'
+import { api } from '@/lib/api'
 
 // Pinia "setup store"
 export const useAuthStore = defineStore('auth', () => {
@@ -108,6 +110,24 @@ export const useAuthStore = defineStore('auth', () => {
         return "We couldn't change your password. Please try again."
     }
 
+    async function deleteAccount(password) {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+            email: user.value.email,
+            password,
+        })
+        if (signInError) return 'That password is not correct. Please try again.'
+
+        try {
+            await api.delete('/me')
+        } catch {
+            return "We couldn't delete your account just now. Please try again later."
+        }
+
+        // forget this player's saved map stations in this browser too
+        try { localStorage.removeItem(`memorygo-stations-${user.value.id}`) } catch { /* storage blocked */ }
+        return null
+    }
+
     // Helps with the signOut
     async function signOut() {
         await supabase.auth.signOut()
@@ -128,6 +148,6 @@ export const useAuthStore = defineStore('auth', () => {
 
     return {
         user, isLoggedIn, init, signIn, signUp, signOut,
-        sendPasswordReset, updatePassword, updateName, changePassword
+        sendPasswordReset, updatePassword, updateName, changePassword, deleteAccount
     }
 })

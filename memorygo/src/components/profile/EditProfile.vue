@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import TextField from '@/components/ui/TextField.vue'
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'delete'])
 const auth = useAuthStore()
 
 // starts as the current name
@@ -142,6 +142,13 @@ function finish() {
         {{ saving ? 'Saving…' : 'Save changes' }}
       </button>
     </form>
+
+    <div class="delete-row">
+      <button type="button" class="delete-btn" @click="emit('delete')">
+        <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+        Delete account
+      </button>
+    </div>
   </section>
   </div>
   </Teleport>
@@ -248,7 +255,6 @@ function finish() {
   font-weight: 700;
 }
 
-/* Terracotta button, matching the profile page's Sign Out button */
 .save-btn {
   width: 100%;
   min-height: 52px;
@@ -270,6 +276,27 @@ function finish() {
 
 .save-btn:disabled {
   opacity: 0.6;
+}
+
+.delete-row {
+  margin-top: 22px;
+  padding-top: 14px;
+  border-top: 2px dashed var(--dash, #d8cba8);
+  text-align: center;
+}
+
+.delete-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  background: none;
+  color: #b23a2a;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 
 /* Pop-up */
