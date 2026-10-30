@@ -17,6 +17,11 @@ import meRoutes from './routes/me.js'
 
 import spiritsRoutes from './routes/spirits.js'
 import streakRoutes from './routes/streak.js'
+import placesRoutes from './routes/places.js'
+import visitsRoutes from './routes/visits.js'
+import searchRoutes from './routes/search.js'
+import routeRoutes from './routes/route.js'
+import journeyRoutes from './routes/journey.js'
 
 const PORT = Number(process.env.PORT) || 8000
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173' 
@@ -36,6 +41,15 @@ app.use('/api/spirits', spiritsRoutes)
 
 app.use('/api/progress', streakRoutes)
 
+app.use('/api/places', placesRoutes)
+
+app.use('/api/visits', visitsRoutes)
+
+app.use('/api/search', searchRoutes)
+
+app.use('/api/route', routeRoutes)
+app.use('/api/journey', journeyRoutes)
+
 
 
 
@@ -54,6 +68,6 @@ app.use((err, req, res, next) => {
     res.status(500).json({ message: 'Something went wrong.' })
 })
 
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Memory Go API running on port ${PORT}`)
+app.listen(PORT, '127.0.0.1', () => {
+    console.log(`Memory Go API running at http://127.0.0.1:${PORT}/api`)
 })

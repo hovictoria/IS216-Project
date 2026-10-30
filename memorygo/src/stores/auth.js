@@ -41,7 +41,7 @@ export const useAuthStore = defineStore('auth', () => {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (!error) {
             // on Success. It contains a session: an access token, refresh token, expiry, and user object
-            // Client saves session to localStorage, so refresh keeps you logged in
+            // Session is kept in memory only (persistSession: false in lib/supabase.js), so a refresh signs you out
             // Starts a timer to swap the access token for a new one before it expires
             return null
         }
@@ -74,7 +74,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     // session listener
-    // getSession() reads the saved session back by looking in localStorage to check if there is a user or not
+    // getSession() checks for a session. With persistSession: false nothing is saved, so on page load this is always null
     async function init() {
         const { data } = await supabase.auth.getSession()
         // if there is no session, return null

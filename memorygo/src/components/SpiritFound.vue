@@ -1,10 +1,16 @@
 <script setup>
 import { ref, watch, nextTick } from 'vue'
+import SpiritCanvas from '@/components/spirits/SpiritCanvas.vue'   // the live 3D spirit
+import ChestCanvas from '@/components/ui/ChestCanvas.vue'          // the bonus chest when a set is finished
+import PaperMap from '@/components/spirits/PaperMap.vue'           // the faint map behind the spirit
 
-// the spirit to show, e.g. { id: 3, name: 'Otter Spirit', emoji: '🦦' }
+// the spirit to show, from POST /api/visits/:id/finish
+// e.g. { id: 'kopi', name: 'Kopi', color: '#B07A45', rarity: 'Rare', set: 'Civic District', lore: '...' }
 // when it's null, the popup is hidden
+// setDone: { name: 'Civic District', bonus: 50 } when this spirit finished its area set (or null)
 const props = defineProps({
     spirit: { type: Object, default: null },
+    setDone: { type: Object, default: null },
 })
 
 // tells the page "the user wants to close the popup"
@@ -24,7 +30,7 @@ watch(() => props.spirit, async (newSpirit) => {
 </script>
 
 <template>
-    <!-- Teleport moves the popup to the end of <body>, so it sits above everything (including the sidebar) -->
+    <!-- Teleport moves the popup to the end of <body>, so it sits above everything (including the game) -->
     <Teleport to="body">
         <Transition name="pop">
 
@@ -37,27 +43,40 @@ watch(() => props.spirit, async (newSpirit) => {
             >
                 <!-- the popup box -->
                 <div
-                    class="spirit-popup card-soft text-center"
+                    class="spirit-popup"
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby="spirit-found-title"
                 >
-                    <p class="spirit-kicker">✨ New spirit found!</p>
+                    <!-- peach top: the spirit in 3D, standing on a faint paper map -->
+                    <div class="spirit-hero">
+                        <span class="spirit-kicker">You found a Spirit!</span>
+                        <PaperMap />
+                        <div class="spirit-model">
+                            <SpiritCanvas :spirit-id="spirit.id" :color="spirit.color" :label="spirit.name" />
+                        </div>
+                    </div>
 
-                    <!-- big emoji (aria-hidden: screen readers read the name instead) -->
-                    <div class="spirit-emoji" aria-hidden="true">{{ spirit.emoji }}</div>
+                    <div class="spirit-body">
+                        <span class="spirit-rarity">{{ spirit.rarity }} · {{ spirit.set }}</span>
+                        <h2 id="spirit-found-title" class="spirit-name">{{ spirit.name }}</h2>
+                        <p class="spirit-lore">{{ spirit.lore }}</p>
 
-                    <h2 id="spirit-found-title">{{ spirit.name }}</h2>
-                    <p class="text-muted-ink mb-0">It's now in your collection.</p>
+                        <!-- this spirit finished its area set: bonus chest -->
+                        <p v-if="setDone" class="set-done">
+                            <ChestCanvas class="set-done-chest" />
+                            <span><strong>{{ setDone.name }} set complete!</strong> +{{ setDone.bonus }} coins</span>
+                        </p>
 
-                    <!-- big, full-width buttons, easy to tap -->
-                    <div class="d-flex flex-column align-items-center gap-2 mt-4">
-                        <router-link to="/spirits" class="btn-cta spirit-cta text-decoration-none" @click="emit('close')">
-                            See my collection
-                        </router-link>
-                        <button ref="closeBtn" type="button" class="btn btn-lg btn-outline-dark w-100" @click="emit('close')">
-                            Close
-                        </button>
+                        <!-- big, full-width buttons, easy to tap -->
+                        <div class="spirit-actions">
+                            <router-link :to="`/spirits/${spirit.id}`" class="spirit-cta" @click="emit('close')">
+                                See my Spirit
+                            </router-link>
+                            <button ref="closeBtn" type="button" class="spirit-close" @click="emit('close')">
+                                Close
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -75,35 +94,137 @@ watch(() => props.spirit, async (newSpirit) => {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 1rem;
-    background: rgba(42, 32, 24, 0.55);
+    padding: 16px;
+    overflow-y: auto;
+    background: rgba(22, 20, 18, 0.55);
+    font-family: var(--font);
+    color: var(--ink);
 }
 
-/* the box itself (card-soft gives it the team's dashed-border style) */
+/* the box itself (paper card with a peach top, like the Spirit page) */
 .spirit-popup {
     width: 100%;
-    max-width: 24rem;
+    max-width: 400px;
+    margin: auto;
+    overflow: hidden;
+    border-radius: 32px;
+    background: var(--paper);
+    box-shadow: 0 24px 60px rgba(22, 20, 18, 0.35);
 }
 
-/* "✨ New spirit found!" */
+.spirit-hero {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 280px;
+    overflow: hidden;
+    border-radius: 0 0 32px 32px;
+    background: var(--peach);
+}
+
+/* "You found a Spirit!" */
 .spirit-kicker {
+    position: absolute;
+    top: 18px;
+    left: 50%;
+    z-index: 1;
+    transform: translateX(-50%);
+    padding: 6px 14px;
+    border-radius: var(--radius-pill);
+    background: var(--ink);
+    color: var(--white);
+    font-size: 16px;
     font-weight: 800;
-    color: var(--terracotta);
-    margin: 0 0 0.5rem;
+    white-space: nowrap;
 }
 
-/* the big emoji */
-.spirit-emoji {
-    font-size: 5rem;
-    line-height: 1;
-    margin-bottom: 0.5rem;
+
+.spirit-model {
+    position: relative;
+    width: 220px;
+    height: 220px;
+    margin-top: 24px;
 }
 
-/* smaller version of the team's big orange button, so it's closer in size to Close */
+.spirit-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 20px 22px 22px;
+}
+
+.spirit-rarity {
+    font-size: 16px;
+    font-weight: 700;
+    opacity: 0.7;
+}
+
+.spirit-name {
+    margin: 0;
+    font-family: var(--font);          /* the app font (not the browser's heading font) */
+    font-size: 48px;
+    font-weight: 700;
+    line-height: 0.95;
+    letter-spacing: -0.055em;
+}
+
+.spirit-lore {
+    margin: 4px 0 0;
+    font-size: 17px;
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+/* "Civic District set complete! +50 coins" */
+.set-done {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 6px 0 0;
+    padding: 8px 14px 8px 6px;
+    border-radius: 20px;
+    background: var(--butter, #F3D57C);
+    font-size: 17px;
+    line-height: 1.3;
+}
+
+.set-done-chest {
+    flex-shrink: 0;
+    width: 52px;
+    height: 52px;
+}
+
+.spirit-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+/* black pill, same as the app's main buttons */
+.spirit-cta,
+.spirit-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 56px;
+    border-radius: var(--radius-pill);
+    font: 700 18px var(--font);
+    text-decoration: none;
+    cursor: pointer;
+}
+
 .spirit-cta {
-    padding: 0.6rem 1.5rem;
-    font-size: 1.15rem;
-    box-shadow: 0 3px 0 var(--terracotta-deep);
+    border: 0;
+    background: var(--ink);
+    color: var(--white);
+}
+
+.spirit-close {
+    border: 1.5px solid var(--ink);
+    background: transparent;
+    color: var(--ink);
 }
 
 /* fade the background in and out */

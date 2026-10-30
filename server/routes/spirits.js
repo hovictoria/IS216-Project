@@ -4,35 +4,68 @@ import { supabase } from '../supabase.js'
 
 const router = Router()
 
-// GET /api/spirits → every spirit, plus which ones this user has found
+// Spirits now come from the new tables (docs/spirits.sql):
+//   spirit_catalog   = all 24 spirits, each hiding at one place
+//   spirit_finds     = which spirits this player has found
+//   spirit_sets_done = which area sets this player has completed
+// Finding a spirit happens in /api/visits/:id/finish (your first paid game at its place), not here.
+// The old `spirits` / `user_spirits` tables are left in Supabase but no longer used.
+
+// GET /api/spirits → every spirit (with its place), plus which ones this user has found and which sets they finished
 router.get('/', requireAuth, async (req, res) => {
-    // 1. All 50 spirits 
-    const { data: spirits, error: spiritsError } = await supabase
-        .from('spirits')
-        .select('id, name, category, emoji')
-        .order('id')
+    // all 3 at the same time (one after another took about 3x as long)
+    const [catalog, finds, sets] = await Promise.all([
+        // 1. All 24 spirits, in the design's order, with the place they hide at
+        supabase
+            .from('spirit_catalog')
+            .select('id, name, color, rarity, set_name, lore, sort_order, place_id, places(name, lat, lng)')
+            .order('sort_order'),
+        // 2. Only THIS (current) user's found spirits
+        supabase
+            .from('spirit_finds')
+            .select('spirit_id, found_at, game, visit_id')
+            .eq('user_id', req.user.id),
+        // 3. The area sets this user has completed (each paid a bonus chest once)
+        supabase
+            .from('spirit_sets_done')
+            .select('set_name, done_at, bonus_coins')
+            .eq('user_id', req.user.id),
+    ])
+    const { data: spirits, error: spiritsError } = catalog
+    const { data: found, error: foundError } = finds
+    const { data: setsDone, error: setsError } = sets
 
     if (spiritsError) {
         console.error(spiritsError)
         return res.status(500).json({ message: 'Could not load spirits.' })
     }
 
-    // 2. Only THIS (current) user's found spirits
-    const { data: found, error: foundError } = await supabase
-        .from('user_spirits')
-        .select('spirit_id, station_id, collected_at')
-        .eq('user_id', req.user.id)
-
     if (foundError) {
         console.error(foundError)
         return res.status(500).json({ message: 'Could not load your collection.' })
     }
 
-    res.json({ spirits, found })
-})
+    if (setsError) {
+        console.error(setsError)
+        return res.status(500).json({ message: 'Could not load your sets.' })
+    }
 
-// how likely a player is to find a spirit when they complete a station, set it ard 50%
-const FIND_CHANCE = 0.5
+    //flatten the place so the page can just use spirit.placeName etc.
+    const rows = spirits.map((s) => ({
+        id: s.id,
+        name: s.name,
+        color: s.color,
+        rarity: s.rarity,
+        set: s.set_name,
+        lore: s.lore,
+        placeId: s.place_id,
+        placeName: s.places?.name ?? null,
+        lat: s.places?.lat ?? null,
+        lng: s.places?.lng ?? null,
+    }))
+
+    res.json({ spirits: rows, found, setsDone })
+})
 
 // today's date in Singapore as 'YYYY-MM-DD' (same approach as streak.js)
 function singaporeToday() {
@@ -40,15 +73,15 @@ function singaporeToday() {
 }
 
 // how many spirits this user has found today (since midnight Singapore time)
-// used by /collect (daily bonus) and /today (dashboard ✓)
+// used by /today (dashboard ✓)
 // returns { count } or { error }
 async function countFoundToday(userId) {
     const startOfToday = `${singaporeToday()}T00:00:00+08:00`   // midnight today in Singapore
     const { count, error } = await supabase
-        .from('user_spirits')
+        .from('spirit_finds')
         .select('spirit_id', { count: 'exact', head: true })   // just count the rows, don't fetch them
         .eq('user_id', userId)
-        .gte('collected_at', startOfToday)                     // found at or after midnight today
+        .gte('found_at', startOfToday)                         // found at or after midnight today
     return { count, error }
 }
 
@@ -65,85 +98,11 @@ router.get('/today', requireAuth, async (req, res) => {
     res.json({ foundToday: count > 0 })   // at least 1 spirit today → true
 })
 
-
-
-// POST /api/spirits/collect → body: { stationId }
-// Called when a player completes a station, they got a chance to find a new spirit.
-// Returns { spirit } if they found one, or { spirit: null } if not this time.
-router.post('/collect', requireAuth, async (req, res) => {
-
-    // 1. Read which station they completed (sent by the page)
-    //if req.body is missing, don't crash, just give undefined (?.)
-    const stationId = Number(req.body?.stationId)
-    if (!Number.isInteger(stationId) || stationId < 1) {
-        return res.status(400).json({ message: 'A valid stationId is required.' })
-    }
-
-    // 2. Daily bonus: if they haven't found any spirit yet today (Singapore time), it's guaranteed
-    const { count: foundToday, error: todayError } = await countFoundToday(req.user.id)
-
-    if (todayError) {
-        console.error(todayError)
-        return res.status(500).json({ message: 'Could not check your daily bonus.' })
-    }
-
-    const dailyBonus = foundToday === 0
-    const chance = dailyBonus ? 1 : FIND_CHANCE   // 100% for the first spirit of the day, otherwise 50%
-
-    // Roll the chance. Unlucky = no spirit this time :(
-    if (Math.random() >= chance) {
-        return res.json({ spirit: null })
-    }
-
-    // 3. Get the spirits this player already has, cannot get same sprits twice
-    const { data: owned, error: ownedError } = await supabase
-        .from('user_spirits')
-        .select('spirit_id')
-        .eq('user_id', req.user.id)
-
-    if (ownedError) {
-        console.error(ownedError)
-        return res.status(500).json({ message: 'Could not check your collection.' })
-    }
-
-    //turns rows like { spirit_id: 1 } into plain numbers, ex: [{spirit_id: 1}, {spirit_id: 3}] becomes [1, 3].
-    const ownedIds = owned.map((row) => row.spirit_id)
-
-    // 4. Get all spirits, keep only the ones they don't have, and pick one at random
-    const { data: allSpirits, error: spiritsError } = await supabase
-        .from('spirits')
-        .select('id, name, category, emoji')
-
-    if (spiritsError) {
-        console.error(spiritsError)
-        return res.status(500).json({ message: 'Could not load spirits.' })
-    }
-
-    //only spirits whose id is not in the owned list
-    const choices = allSpirits.filter((s) => !ownedIds.includes(s.id))
-
-    //handle when use collected all spirits in the db
-    if (choices.length === 0) {
-        return res.json({ spirit: null, allFound: true })   
-    }
-
-    //pick a random item
-    const spirit = choices[Math.floor(Math.random() * choices.length)]
-
-    // 5. Save it to their collection (collected_at is filled in automatically by the database)
-    const { error: insertError } = await supabase
-        .from('user_spirits')
-
-        //add a new row user_spirits
-        .insert({ user_id: req.user.id, spirit_id: spirit.id, station_id: stationId })
-
-    if (insertError) {
-        console.error(insertError)
-        return res.status(500).json({ message: 'Could not save your spirit.' })
-    }
-
-    // dailyBonus tells the page this was the guaranteed first spirit of the day
-    res.json({ spirit, dailyBonus })
+// POST /api/spirits/collect → retired.
+// It used to give a random spirit with a 50% chance (100% for the first of the day), and could be called
+// again and again. Spirits are now found by playing at their place (see /api/visits/:id/finish).
+router.post('/collect', requireAuth, (req, res) => {
+    res.status(410).json({ message: 'Spirits are now found by playing a game at their place.' })
 })
 
 

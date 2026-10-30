@@ -2,6 +2,7 @@
 import { ref, computed, onBeforeUnmount } from 'vue'
 import GameLayout from '../../components/games/GameLayout.vue'
 import GameProgress from '../../components/games/GameProgress.vue'
+import GameReward from '../../components/games/GameReward.vue'
 import { useGameReward } from '@/lib/gamereward'
 
 import LevelUpNotice from '@/components/LevelUpNotice.vue'
@@ -106,10 +107,7 @@ const speech = computed(() => `Sequence Recall. ${message.value}`)
         </span>
       </template>
     </GameProgress>
-    <div v-if="reward" class="text-center fw-bold mt-4" aria-live="polite">
-        <i class="fa-solid fa-star text-gold me-2"></i>
-        You earned {{ reward.earned.xp }} XP and {{ reward.earned.coins }} coins.
-    </div><br>
+    <GameReward :reward="reward" />
     <LevelUpNotice :reward="reward" />
     
     <!-- Pads -->
@@ -117,7 +115,7 @@ const speech = computed(() => `Sequence Recall. ${message.value}`)
       <div class="row row-cols-2 g-3">
         <div v-for="pad in pads" :key="pad.id" class="col">
           <button
-            class="pad w-100 p-0 d-flex align-items-center justify-content-center rounded-4 shadow-sm"
+            class="pad w-100 p-0 d-flex align-items-center justify-content-center"
             :class="{ active: activePad === pad.id, waiting: status !== 'playing' && activePad !== pad.id }"
             :disabled="status !== 'playing'"
             :aria-label="`Pad ${pad.emoji}`"
@@ -142,7 +140,7 @@ const speech = computed(() => `Sequence Recall. ${message.value}`)
 </template>
 
 <style scoped>
-/* Only game-specific styles live here. Everything else is in the shared components. */
+/* Only game-specific styles live here. */
 
 .pads {
     max-width: 320px;
@@ -150,16 +148,19 @@ const speech = computed(() => `Sequence Recall. ${message.value}`)
 
 .pad {
     aspect-ratio: 1;
-    border: 2px solid var(--blue);
-    background: #fffdf6;
+    border: 2px solid var(--ink);
+    border-radius: 20px;
+    background: #fff;
+    color: var(--ink);
+    box-shadow: 0 2px 8px rgba(22, 20, 18, 0.08);
     font-size: 64px;
     line-height: 1;
     transition: transform 0.1s, background-color 0.1s;
 }
 
 .pad:not(:disabled):hover {
-    background: #fff;
-    box-shadow: 0 0 0 2px var(--blue);
+    background: #fffaf3;
+    box-shadow: 0 0 0 2px var(--ink);
 }
 
 .pad:disabled {
@@ -173,16 +174,16 @@ const speech = computed(() => `Sequence Recall. ${message.value}`)
 
 /* Lit up */
 .pad.active {
-    background: #fbf0cf;
-    border-color: var(--gold);
-    box-shadow: 0 0 0 3px var(--gold);
+    background: #fdf1c8;
+    border-color: var(--gold-deep);
+    box-shadow: 0 0 0 4px var(--gold);
     transform: scale(1.05);
     opacity: 1;
 }
 
 .pad:focus-visible {
-    outline: 3px solid var(--gold);
-    outline-offset: 2px;
+    outline: 3px solid var(--blue);
+    outline-offset: 3px;
 }
 
 @media (prefers-reduced-motion: reduce) {

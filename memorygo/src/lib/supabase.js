@@ -17,4 +17,9 @@ if (!url || !key) {
 
 // create a supabase connection object
 // exported so any file can just use import { supabase }
-export const supabase = createClient(url, key)
+// persistSession: false -> the login is kept in memory only, not saved to localStorage.
+//   Closing the tab or refreshing the page signs the user out, so every visit starts at login.
+//   To remember users again, delete the options object (Supabase saves to localStorage by default).
+export const supabase = createClient(url, key, {
+    auth: { persistSession: false },
+})

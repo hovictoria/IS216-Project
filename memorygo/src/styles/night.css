@@ -1,0 +1,184 @@
+/* ----------------------------------------------------------------------------------------------------------
+PSEUDOCODE
+filename:   styles/night.css
+purpose:    - the NIGHT look (DESIGN_SPEC.md section 6, "Moods"), 7 pm to 6 am. lib/useMood.js puts class="night"
+              on <html>; every rule here starts with html.night, so nothing changes in the day
+            - the rule from the design: backgrounds go dark (night sky, darker map), headings that sit on those
+              dark backgrounds turn light, and cards, sheets and buttons stay light so they stay easy to read
+            - pages: landing / sign in / sign up, the map, the Journey tab, the Spirits tab
+              (the Spirit page, the Me page and the game pages keep their light paper look)
+imports:    loaded once in main.js
+---------------------------------------------------------------------------------------------------------- */
+
+html.night {
+    --night-sky: #1C2140;
+    --night-text: #F4F0E8;
+    --night-indigo: #5B4BB5;
+    --night-blue: #2F6FB0;
+}
+
+/* =========================================================
+   Landing / sign in / sign up (components/auth/)
+   ========================================================= */
+
+/* night sky instead of the warm morning light, with a soft moonlit glow behind the island */
+html.night .auth {
+    background: var(--night-sky);
+    color: var(--night-text);
+}
+
+html.night .auth .glow {
+    background:
+        radial-gradient(ellipse 55% 45% at 60% 55%, rgba(91, 75, 181, 0.45), rgba(91, 75, 181, 0) 70%),
+        linear-gradient(180deg, #141834 0%, #1C2140 55%, #262B52 100%);
+}
+
+/* small white stars (SkyBackdrop.vue) */
+html.night .auth .stars {
+    display: block;
+}
+
+/* the faint paper map becomes faint pale lines on the dark sky */
+html.night .auth .map-lines {
+    opacity: 0.1;
+}
+
+/* the sun becomes a pale moon */
+html.night .auth .sun {
+    background: #F4F0E8;
+    box-shadow: 0 0 40px 8px rgba(244, 240, 232, 0.35);
+}
+
+/* the island is lit by moonlight: dimmer and a little less colourful */
+html.night .auth .island canvas,
+html.night .journey-page .island canvas {
+    filter: brightness(0.68) saturate(0.85);
+}
+
+/* links on the sky (logo, Sign in, "I already have an account", back) turn light;
+   the paper sheet keeps dark text */
+html.night .auth .header-signin,
+html.night .auth .back,
+html.night .auth--landing .account-link {
+    color: var(--night-text);
+}
+
+html.night .auth .sheet {
+    color: var(--ink);
+}
+
+/* the back arrow sits in a white circle, so it stays dark */
+html.night .auth .back-circle {
+    color: var(--ink);
+}
+
+/* phone landing: the buttons sit on the paper sheet, so the link there stays dark */
+@media (max-width: 767px) {
+    html.night .auth--landing .account-link {
+        color: var(--ink);
+    }
+}
+
+/* =========================================================
+   Map (views/map.vue): a deep blue tint over the map itself.
+   The tint sits right above the map picture (views/map.vue adds .night-tint there), so the blue dot,
+   search, cards and sheets above it stay as they are
+   ========================================================= */
+.night-tint {
+    display: none;
+}
+
+html.night .night-tint {
+    display: block;
+    position: absolute;
+    inset: 0;
+    background: rgba(22, 30, 76, 0.64);
+    mix-blend-mode: multiply;
+    pointer-events: none;
+}
+
+/* =========================================================
+   Journey tab + Spirits tab: darker blurred map, indigo + blue glows,
+   light headings, glass cards more solid (about 80%) so dark text stays readable
+   ========================================================= */
+html.night .journey-page,
+html.night .spirits-page {
+    background: var(--night-sky);
+}
+
+html.night .journey-page .backdrop-map,
+html.night .spirits-page .backdrop-map {
+    filter: blur(18px) saturate(1.1) brightness(0.45);
+    opacity: 0.7;
+}
+
+html.night .journey-page .glow-peach,
+html.night .spirits-page .glow-lilac {
+    background: var(--night-indigo);
+    opacity: 0.55;
+}
+
+html.night .journey-page .glow-sage,
+html.night .spirits-page .glow-peach {
+    background: var(--night-blue);
+    opacity: 0.5;
+}
+
+/* headings and notes that sit straight on the dark background */
+html.night .journey-page .wordmark,
+html.night .journey-page .greeting,
+html.night .journey-page .title,
+html.night .journey-page .note,
+html.night .journey-page .anytime-title,
+html.night .journey-page .anytime-note,
+html.night .spirits-page .wordmark,
+html.night .spirits-page .eyebrow,
+html.night .spirits-page .title,
+html.night .spirits-page .note,
+html.night .spirits-page .progress-label,
+html.night .spirits-page .collection-title {
+    color: var(--night-text);
+}
+
+/* Spirits progress bar on the dark background */
+html.night .spirits-page .progress {
+    background: rgba(244, 240, 232, 0.2);
+}
+
+html.night .spirits-page .progress-fill {
+    background: var(--night-text);
+}
+
+/* glass cards: more solid at night */
+html.night .journey-page .box,
+html.night .spirits-page .set-card,
+html.night .spirits-page .sets-card,
+html.night .spirits-page .tile {
+    background: rgba(255, 255, 255, 0.8);
+}
+
+html.night .journey-page .challenge,
+html.night .spirits-page .newest {
+    background: rgba(246, 196, 164, 0.88);
+}
+
+/* the trip card is dark glass already: keep it dark, just more solid */
+html.night .journey-page .trip {
+    background: rgba(40, 36, 52, 0.9);
+}
+
+html.night .spirits-page .tile.locked {
+    background: rgba(255, 255, 255, 0.55);
+    border-color: rgba(244, 240, 232, 0.5);
+}
+
+html.night .journey-page .game {
+    filter: saturate(0.9);
+}
+
+html.night .journey-page .tone-peach { background: rgba(246, 196, 164, 0.9); }
+html.night .journey-page .tone-sage { background: rgba(200, 219, 169, 0.9); }
+html.night .journey-page .tone-butter { background: rgba(243, 213, 124, 0.9); }
+html.night .journey-page .tone-lilac { background: rgba(201, 184, 245, 0.9); }
+html.night .journey-page .tone-sky { background: rgba(169, 205, 232, 0.9); }
+html.night .journey-page .tone-coral { background: rgba(233, 160, 140, 0.9); }

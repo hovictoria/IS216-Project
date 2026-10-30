@@ -1,16 +1,14 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { checkMood } from '../lib/useMood'
 
 /* Auth - Landing, Login, SignUp */
 import landing from "../components/auth/landing.vue"
 import login from "../components/auth/login.vue"
 import signup from "../components/auth/signup.vue"
 
-/* Home Page menu dashboard (teammate's views/main.vue, which includes the sidebar menu) */
-import main from "../views/main.vue"
 
 /* Games */
-import games from "../components/games/games.vue"
 import memory from "../views/games/memory.vue"
 import object from "../views/games/object.vue"
 import sequence from "../views/games/sequence.vue"
@@ -20,6 +18,10 @@ import oddoneout from "../views/games/oddoneout.vue"
 
 /* Collection */
 import collection from "../components/charactercollection.vue"
+import spirit from "../views/spirit.vue"
+
+/* Journey tab */
+import journeyView from "../views/journey.vue"
 
 /* Map */
 import mapView from "../views/map.vue" 
@@ -48,13 +50,23 @@ const router = createRouter({
       component: memory
     },
     {
+      // the old dashboard was removed; old links land on the Journey tab instead
       path: "/menu",
-      component: main,
-      meta: { requiresAuth: true }
+      redirect: "/journey"
     },
     {
       path: "/spirits",
       component: collection,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: "/spirits/:id",
+      component: spirit,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: "/journey",
+      component: journeyView,
       meta: { requiresAuth: true }
     },
     {
@@ -98,6 +110,8 @@ const router = createRouter({
 
 // Runs before every page change. 'to' is where the user is trying to go
 router.beforeEach((to) => {
+  checkMood() // day or night look: look at the clock again (lib/useMood.js)
+
   const auth = useAuthStore() // here we are using auth's const isLoggedIn
 
   // Logged out and heading somewhere protected: directed to sign in first
@@ -105,9 +119,9 @@ router.beforeEach((to) => {
     return '/login'
   }
 
-  // Already logged in: skip the landing & login page (goes straight to menu dashboard)
+  // Already logged in: skip the landing & login page (goes straight to the map)
   if ((to.path === '/login' || to.path === '/' || to.path === '/signup') && auth.isLoggedIn) {
-    return '/menu'
+    return '/map'
   }
 
 })

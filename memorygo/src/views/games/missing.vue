@@ -1,33 +1,17 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import GameLayout from '../../components/games/GameLayout.vue'
 import GameProgress from '../../components/games/GameProgress.vue'
+import GameReward from '../../components/games/GameReward.vue'
 import { useGameReward } from '@/lib/gamereward'
 
 import LevelUpNotice from '@/components/LevelUpNotice.vue'
 
 const { reward, claim, reset } = useGameReward('whats-missing')
 
-const files = import.meta.glob('@/assets/whats-missing/*.{png,jpg,jpeg,webp,svg,avif}', {
-    eager: true,
-    import: 'default'
-})
-
-const pool = Object.entries(files).map(([path, src]) => {
-    const file = path.split('/').pop().replace(/\.[^.]+$/, '')
-    return { id: file, name: file.replace(/[-_]+/g, ' '), src }
-})
-
+const pool = ['🍎', '🐶', '🌸', '🌳', '🐘', '🚗', '🏠', '🍌', '🐱', '⭐', '🎈', '☂️', '🐟', '⚽']
 const roundSizes = [4, 4, 5, 5, 6]
 const TOTAL_ROUNDS = roundSizes.length
-
-// load every picture once up front so none pop in late between rounds
-onMounted(() => {
-    pool.forEach((item) => {
-        const img = new Image()
-        img.src = item.src
-    })
-})
 
 function shuffle(array) {
     const arr = [...array]
@@ -61,7 +45,7 @@ const results = ref([]) // true / false per finished round
 const finished = ref(false)
 
 const score = computed(() => results.value.filter(Boolean).length)
-const isCorrect = computed(() => chosen.value?.id === round.value.missing.id)
+const isCorrect = computed(() => chosen.value === round.value.missing)
 
 function startQuestion() {
     phase.value = 'question'
@@ -70,14 +54,14 @@ function startQuestion() {
 function choose(option) {
     if (phase.value !== 'question') return
     chosen.value = option
-    results.value.push(option.id === round.value.missing.id)
+    results.value.push(option === round.value.missing)
     phase.value = 'result'
 }
 
 function nextRound() {
     if (roundNumber.value === TOTAL_ROUNDS) {
-        finished.value = true
-        claim({ score: score.value })
+        finished.value = true;
+        claim({ score: score.value });
         return
     }
     roundNumber.value++
@@ -93,13 +77,13 @@ function restartGame() {
     results.value = []
     finished.value = false
     phase.value = 'study'
-    reset()
+    reset();
 }
 
 function optionClass(option) {
     if (phase.value !== 'result') return ''
-    if (option.id === round.value.missing.id) return 'correct'
-    if (option.id === chosen.value?.id) return 'wrong'
+    if (option === round.value.missing) return 'correct'
+    if (option === chosen.value) return 'wrong'
     return ''
 }
 
@@ -128,28 +112,20 @@ const speech = computed(() => `What's missing? ${instruction.value}`)
       :total="TOTAL_ROUNDS"
       :results="results"
     />
-    <div v-if="reward" class="text-center fw-bold mt-4" aria-live="polite">
-        <i class="fa-solid fa-star text-gold me-2"></i>
-        You earned {{ reward.earned.xp }} XP and {{ reward.earned.coins }} coins.
-    </div><br>
+    <GameReward :reward="reward" />
     <LevelUpNotice :reward="reward" />
-
+    
     <template v-if="!finished">
 
       <!-- Items -->
       <div class="row row-cols-3 g-3 justify-content-center mb-3">
-        <div v-for="(item, i) in round.shown" :key="item.id" class="col">
+        <div v-for="(item, i) in round.shown" :key="i" class="col">
           <div
-            class="tile w-100 d-flex align-items-center justify-content-center rounded-4 shadow-sm fs-1"
+            class="g-tile tile w-100 d-flex align-items-center justify-content-center fs-1"
             :class="{ gap: phase !== 'study' && i === round.missingIndex }"
           >
-            <template v-if="phase === 'study' || i !== round.missingIndex">
-              <img :src="item.src" :alt="item.name" class="pic" draggable="false" />
-            </template>
-            <template v-else>
-              <img v-if="phase === 'result'" :src="item.src" :alt="item.name" class="pic" draggable="false" />
-              <span v-else aria-label="Missing item">?</span>
-            </template>
+            <template v-if="phase === 'study' || i !== round.missingIndex">{{ item }}</template>
+            <template v-else>{{ phase === 'result' ? item : '?' }}</template>
           </div>
         </div>
       </div>
@@ -161,22 +137,21 @@ const speech = computed(() => `What's missing? ${instruction.value}`)
 
       <!-- Answer options -->
       <div v-if="phase !== 'study'" class="row row-cols-4 g-2 g-md-3 mb-3">
-        <div v-for="option in round.options" :key="option.id" class="col">
+        <div v-for="option in round.options" :key="option" class="col">
           <button
-            class="option w-100 p-0 position-relative d-flex align-items-center justify-content-center rounded-4 shadow-sm"
+            class="g-option option w-100 p-0 position-relative d-flex align-items-center justify-content-center fs-2"
             :class="optionClass(option)"
             :disabled="phase === 'result'"
-            :aria-label="option.name"
             @click="choose(option)"
           >
             <span
-              v-if="phase === 'result' && option.id === round.missing.id"
+              v-if="phase === 'result' && option === round.missing"
               class="check position-absolute top-0 end-0 m-1 rounded-circle d-flex align-items-center justify-content-center"
               aria-hidden="true"
             >
               <i class="fa-solid fa-check"></i>
             </span>
-            <img :src="option.src" alt="" class="pic" draggable="false" />
+            {{ option }}
           </button>
         </div>
       </div>
@@ -194,59 +169,26 @@ const speech = computed(() => `What's missing? ${instruction.value}`)
 </template>
 
 <style scoped>
-/* Only game-specific styles live here. Everything else is in the shared components. */
+/* Only game-specific styles live here. Tiles, answer buttons and colours are the shared
+   .g-tile / .g-option styles in GameLayout. */
 
-/* Pictures: fill the square without stretching or cropping */
-.pic {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    padding: 12%;
-    user-select: none;
-    pointer-events: none;
-}
-
-/* Items */
 .tile {
     aspect-ratio: 1;
-    border: 2px solid #e3dcc6;
-    background: #fffdf6;
 }
 
+/* The gap where the missing item was */
 .tile.gap {
-    border: 2px dashed var(--gold);
-    background: #fbf0cf;
-    color: var(--gold);
+    border: 2px dashed var(--gold-deep);
+    background: #fdf3d3;
+    color: var(--gold-deep);
 }
 
-/* Answer options */
 .option {
     aspect-ratio: 1;
-    border: 2px solid var(--blue);
-    background: #fffdf6;
-}
-
-.option:hover:not(:disabled) {
-    background: #fff;
-    box-shadow: 0 0 0 2px var(--blue);
+    color: var(--ink);
 }
 
 .option:disabled {
     cursor: default;
-}
-
-.option:focus-visible {
-    outline: 3px solid var(--gold);
-    outline-offset: 2px;
-}
-
-.option.correct {
-    background: #e4efdc;
-    border-color: var(--green);
-}
-
-.option.wrong {
-    background: #f6dcd8;
-    border-color: var(--red, #b3402f);
 }
 </style>

@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { GAME_NAMES } from '@/config/progression'
 import { areas } from '@/data/stations'
+import SpiritFound from '@/components/SpiritFound.vue'
 
 // The game passes in its reward object (from gamereward.js)
 const props = defineProps({
@@ -26,7 +27,12 @@ const newAreas = computed(() =>
 
 // Closed by tapping outside the card; opens again on the next reward
 const dismissed = ref(false)
-watch(() => props.reward, () => { dismissed.value = false })
+watch(() => props.reward, () => { dismissed.value = false; spiritClosed.value = false })
+
+// A game played at a place can also find that place's Spirit (reward.spirit, from the server).
+// That popup comes first; the level-up card waits until it's closed
+const spiritClosed = ref(false)
+const spiritToShow = computed(() => (spiritClosed.value ? null : props.reward?.spirit ?? null))
 
 // Continue takes the player back to the map to try what they unlocked
 const router = useRouter()
@@ -48,7 +54,7 @@ const confetti = Array.from({ length: 28 }, (_, i) => ({
 <template>
   <Teleport to="body">
     <Transition name="level-up">
-      <div v-if="levelledUp && !dismissed" class="overlay" @click.self="dismissed = true">
+      <div v-if="levelledUp && !dismissed && !spiritToShow" class="overlay" @click.self="dismissed = true">
         <div class="confetti" aria-hidden="true">
           <span v-for="(piece, i) in confetti" :key="i" :style="piece"></span>
         </div>
@@ -80,10 +86,12 @@ const confetti = Array.from({ length: 28 }, (_, i) => ({
       </div>
     </Transition>
   </Teleport>
+
+  <SpiritFound :spirit="spiritToShow" :set-done="reward?.setDone" @close="spiritClosed = true" />
 </template>
 
 <style scoped>
-/* Colours from the dashboard (views/main.vue), set here because the pop-up sits outside the page */
+/* Colours from the old dashboard, set here because the pop-up sits outside the page */
 .overlay {
     --card: #fffbf0;
     --ink: #2a2018;

@@ -1,610 +1,1447 @@
+<!--------------------------------------------------------------------------------------------------------
+PSEUDOCODE
+filename:   views/map.vue
+purpose:    - the Map (home) screen, where users land after signing in (prototype 04/05/06-Home*.html, 03-WebMap.html)
+            - full-screen MapLibre map with a marker + dashed play zone for each place
+            - phone: search bar + coins on top, draggable "Near you" sheet, bottom nav
+            - iPad / laptop: glass sidebar on the left, nav at the top-right, zoom buttons at the bottom-right
+            - places come from our Express server (GET /api/places → Supabase `places` table).
+              Every place shows as playable until the `visits` table exists (step 6)
+            - cards just centre the map on the place. Place preview, search, route and journey are later steps
+imports:    MapLibre, lib/paperMapStyle.js (colours), lib/mapPins3d.js (3D pins), lib/geo.js (distance maths),
+            data/placeLabels.js (MRT colours), components/map/* (sheet, card, search bar),
+            components/ui/* (nav, coins, underline), lib/api.js (places + coins)
+---------------------------------------------------------------------------------------------------------->
+
 <script setup>
-import {ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { stations, areas } from '../data/stations'
-import { useAuthStore } from '../stores/auth'
-import AppMenu from '@/components/menu.vue'
-//system progression
-import { useProgression } from '@/composables/useProgression'
-import { areaUnlockLevel } from '@/config/progression'
 
-import { useSpiritReward } from '@/lib/spiritreward'      // chance to find a spirit at a station
-import SpiritFound from '@/components/SpiritFound.vue'     // "You found a spirit!" popup
+import { MRT_COLOURS, lineColour } from '@/data/placeLabels'
+import { distanceM, circleRing } from '@/lib/geo'
+import { MAP_STYLE_URL, applyPaperStyle } from '@/lib/paperMapStyle'
+import { createPins3d, pinScale } from '@/lib/mapPins3d'
+import { api } from '@/lib/api'
 
+import BottomSheet from '@/components/map/BottomSheet.vue'
+import PlaceCard from '@/components/map/PlaceCard.vue'
+import SearchBar from '@/components/map/SearchBar.vue'
+import PlaceSearch from '@/components/map/PlaceSearch.vue'
+import RoutePanel from '@/components/map/RoutePanel.vue'
+import JourneyHud from '@/components/map/JourneyHud.vue'
+import { useJourneyStore } from '@/stores/journey'
+import { useJourney } from '@/lib/useJourney'
+import AppNav from '@/components/ui/AppNav.vue'
+import CoinPill from '@/components/ui/CoinPill.vue'
+import HandUnderline from '@/components/ui/HandUnderline.vue'
+import appLogo from '@/assets/app-logo.png'
 
+// Used until the browser gives us a real location (or if location is turned off)
 const SMU = [103.8502, 1.2963]
-const { refreshProgress, canEnterArea } = useProgression()
 
-// spirit rewards: foundSpirit opens the popup, dismiss closes it
-const { foundSpirit, collect, dismiss } = useSpiritReward()
+// The map can't be panned or zoomed out past Singapore (MapLibre's maxBounds + minZoom).
+// A little sea is left around the island so coastal places (Changi, Tuas, Sentosa) aren't jammed
+// against the screen edge or hidden behind the sheet / sidebar
+const SINGAPORE_BOUNDS = [
+    [103.55, 1.13],                          // south-west corner (lng, lat): past Tuas, below Sentosa
+    [104.13, 1.50],                          // north-east corner: past Changi, above Woodlands
+]
+const MIN_ZOOM = 10                          // about "the whole island"
 
-// landing page colours (from SplashMap.vue)
-const C = {
-    land: '#F3E8D2',
-    landuse: '#EFE2C6',
-    park: '#CFE0B4',
-    water: '#A9D3E6',
-    road: '#FDFBF2',
-    roadEdge: '#E8D8B7',
-    text: '#4D4134',
-    textHalo: '#FFFBF2',
+const inSingapore = ([lng, lat]) =>
+    lng >= SINGAPORE_BOUNDS[0][0] && lng <= SINGAPORE_BOUNDS[1][0]
+    && lat >= SINGAPORE_BOUNDS[0][1] && lat <= SINGAPORE_BOUNDS[1][1]
+
+// ---------- Screen size ----------
+// The sheet is a sidebar from 768px up, so the card layout and map padding change with it
+const wideQuery = window.matchMedia('(min-width: 768px)')
+const isWide = ref(wideQuery.matches)
+const onWideChange = (e) => { isWide.value = e.matches }
+
+// ---------- Sheet + filters ----------
+const detent = ref('middle')                 // 'down' | 'middle' | 'up' (phone only)
+const filter = ref('all')                    // 'all' | 'mrt' | 'spots'
+const FILTERS = [
+    { id: 'all', label: 'All' },
+    { id: 'mrt', label: 'MRT' },
+    { id: 'spots', label: 'Spots' },
+]
+
+// ---------- Player ----------
+const userPos = ref(SMU)                     // [lng, lat]
+const coins = ref(null)                      // null = still loading, or the server is off
+const selectedId = ref(null)                 // the place whose label shows on the map
+
+// ---------- Places (from the server) ----------
+const places = ref([])                       // filled in by loadPlaces()
+const placesStatus = ref('loading')          // 'loading' | 'ready' | 'error'
+
+// Does this place pass the All / MRT / Spots filter?
+function passesFilter(place) {
+    if (filter.value === 'mrt') return place.kind === 'mrt'
+    if (filter.value === 'spots') return place.kind === 'spot'
+    return true
 }
 
-// building colours: cream like the HDB blocks, pastels like the shophouses
-const BUILDING_COLOURS = ['#F2C4B4', '#F3D58A', '#FFFBF2', '#F4E6CB']
+// ---------- How much to show (328 places cover all of Singapore) ----------
+const NEAR_M = 2000              // "Near you" cards: places within 2 km of the user (~25 min walk)
+const MAX_CARDS = 20
+const PIN_RANGE_M = 3000         // pins + zones: within 3 km of the middle of the map
+const MIN_PIN_ZOOM = 13          // zoomed out further than this, no pins at all (they would pile up)
+const SPOTS_ZOOM = 15            // below this, only MRT stations (+ the selected place); spots and line codes appear above it
+const ALL_ZONES_ZOOM = 16.5      // at street level every nearby zone is drawn; otherwise only the selected place's
 
-const mapE1 = ref(null)
+// Where the map is looking, updated after every pan/zoom (see onMapMoved)
+const mapCentre = ref(SMU)
+const mapZoom = ref(16.2)
+
+// Each place that passes the filter, with its distance from the user
+const withDistance = computed(() =>
+    places.value
+        .filter(passesFilter)
+        .map((p) => ({ place: p, distance: distanceM(userPos.value, [p.lng, p.lat]) }))
+)
+
+// Cards: the nearest places to the USER (stays put when you pan the map)
+const visiblePlaces = computed(() =>
+    withDistance.value
+        .filter(({ distance }) => distance <= NEAR_M)
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, MAX_CARDS)
+)
+
+// Pins: places around where the MAP is looking (follows you as you pan).
+// Zoomed out a bit, only MRT stations show, so the overview stays clean; the selected place always shows
+const pinPlaces = computed(() => {
+    if (mapZoom.value < MIN_PIN_ZOOM) return []
+    const showSpots = mapZoom.value >= SPOTS_ZOOM
+    return withDistance.value.filter(({ place }) =>
+        (showSpots || place.kind === 'mrt' || place.id === selectedId.value)
+        && distanceM(mapCentre.value, [place.lng, place.lat]) <= PIN_RANGE_M)
+})
+
+// Which look the cards use: sidebar, stacked list (sheet up), or sideways rail (sheet middle/down)
+const cardLayout = computed(() => {
+    if (isWide.value) return 'compact'
+    return detent.value === 'up' ? 'stacked' : 'rail'
+})
+
+// ============================================================================================
+// Map
+// ============================================================================================
+const mapEl = ref(null)
 let map = null
-let playerMarker = null
+let userMarker = null
 let watchId = null
+const markers = new Map()                    // place id -> { el, marker } for the pins on screen now
 
-const fakeMode = ref(false)
-const isDev = import.meta.env.DEV
-const playerPos = ref(SMU)
-const playerAccuracy = ref(null)
-const selected = ref(null)
+// The 3D pins and chests, drawn by three.js inside the map (lib/mapPins3d.js)
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+const pins3d = createPins3d({ reducedMotion })
 
-// message shown when location isn't working well ('' = no message)
-const locationMessage = ref('')
-
-// big pop-up message for unlocking an area ('' = hidden)
-const celebration = ref('')
-let celebrationTimer = null
-
-function celebrate(text) {
-    celebration.value = text
-    clearTimeout(celebrationTimer)
-    celebrationTimer = setTimeout(() => {
-        celebration.value = ''
-    }, 4000)
+// Which 3D model a place gets (DESIGN_SPEC.md section 5, "Map markers")
+function markerKind(place) {
+    if (place.state === 'undiscovered') return 'chest'
+    if (place.state === 'collected') return 'green'
+    return place.kind === 'mrt' ? 'blue' : 'red'
 }
 
-const LOCATION_ERRORS = {
-    1: "📍 We can't see your location. Please allow location for this site in your browser settings, then refresh the page.",
-    2: "📡 We can't find your location right now. Try moving outdoors or near a window.",
-    3: "⏳ Finding your location is taking a while. Please wait a moment…",
+// Play-zone tint, matching the card colours
+function zoneColour(place) {
+    if (place.state === 'undiscovered') return '#FFFFFF'
+    if (place.state === 'collected') return '#C8DBA9'
+    return place.kind === 'mrt' ? '#F3D57C' : '#F6C4A4'
 }
 
-// save progress in the browser, separately for each logged-in user
-const auth = useAuthStore()
-const SAVE_KEY = `memorygo-stations-${auth.user?.id}`
-
-function loadProgress() {
-    try {
-        const saved = localStorage.getItem(SAVE_KEY)
-        return saved ? JSON.parse(saved) : []
-    } catch {
-        return []
+// The dashed circles, as GeoJSON MapLibre can draw.
+// Only the selected place's zone, unless zoomed right in (all of them overlapping looked like you could
+// play everything from one spot). The zones still exist for tap-in either way; this is only what's drawn
+function zonesGeoJson() {
+    const drawn = mapZoom.value >= ALL_ZONES_ZOOM
+        ? pinPlaces.value
+        : pinPlaces.value.filter(({ place }) => place.id === selectedId.value)
+    return {
+        type: 'FeatureCollection',
+        features: drawn.map(({ place }) => ({
+            type: 'Feature',
+            properties: { colour: zoneColour(place) },
+            geometry: { type: 'Polygon', coordinates: [circleRing([place.lng, place.lat], place.radiusM)] },
+        })),
     }
 }
 
-function saveProgress() {
-    try {
-        localStorage.setItem(SAVE_KEY, JSON.stringify(completedIds.value))
-    } catch {
-        // storage can be blocked (e.g. private browsing); progress just won't be kept
+// Markers are plain DOM elements (MapLibre places them), so we build them by hand
+function createMarkerEl(place) {
+    const el = document.createElement('button')
+    el.type = 'button'
+    el.className = 'place-marker'
+    el.setAttribute('aria-label', place.name)
+
+    const label = document.createElement('span')
+    label.className = 'marker-label'
+
+    // Invisible box the size of the 3D model, so tapping the pin works (three.js draws the pin itself)
+    const hit = document.createElement('span')
+    hit.className = markerKind(place) === 'chest' ? 'marker-hit marker-chest' : 'marker-hit marker-pin'
+
+    el.append(label, hit)
+
+    // MRT stations get their line codes (EW13, NS25...) in a little pill under the pin
+    if (place.kind === 'mrt') {
+        const lines = document.createElement('span')
+        lines.className = 'marker-lines'
+        for (const code of place.lineCodes) {
+            const chip = document.createElement('span')
+            chip.textContent = code
+            chip.style.background = MRT_COLOURS[code.slice(0, 2)]
+            lines.append(chip)
+        }
+        el.append(lines)
     }
+
+    el.addEventListener('click', () => openPlace(place))
+    return el
 }
 
-// stations this player has completed (loaded from saved progress)
-const completedIds = ref(loadProgress())
+// Make the markers match pinPlaces: add the ones that came into range, remove the ones that left,
+// and put the "Name · 300 m" label on the selected place. Only nearby places have a marker at all,
+// so MapLibre isn't moving 328 of them around on every frame
+function refreshMarkers() {
+    if (!map) return
+    const visibleIds = new Set(pinPlaces.value.map(({ place }) => place.id))
 
-// function isAreaUnlocked(areaId) {
-//     if (areaId === 1) return true
-//     const previousStations = stations.filter((s) => s.area === areaId - 1)
-//     return previousStations.every((s) => completedIds.value.includes(s.id))
-// }
-
-// Areas unlock by level
-function isAreaUnlocked(areaId) {
-    return canEnterArea(areaId)
-}
-
-function getStatus(station) {
-    if (completedIds.value.includes(station.id)) return 'completed'
-    if (!isAreaUnlocked(station.area)) return 'locked'
-    return 'available'
-}
-
-// the HTML element for each station tag, looked up by station id
-const stationEls = {}
-
-// (re)draw one station tag to match its current status
-function drawStationChip(station) {
-    const status = getStatus(station)
-
-    let badge = ''
-    if (status === 'completed') badge = ' ✅'
-    if (status === 'locked') badge = ' 🔒'
-
-    const el = stationEls[station.id]
-    el.classList.remove('available', 'completed', 'locked')
-    el.classList.add('station-chip', status)
-    el.innerHTML = `<span class="station-emoji">${station.emoji}</span>${station.name}${badge}`
-}
-
-// redraw every station tag (e.g. after completing one, which may unlock an area)
-function refreshStations() {
-    for (const station of stations) {
-        drawStationChip(station)
+    for (const [id, { marker }] of markers) {
+        if (!visibleIds.has(id)) {
+            marker.remove()
+            markers.delete(id)
+        }
     }
-}
 
-// for now, Start completes the station straight away (the puzzle comes later)
-function completeStation() {
-    const station = selected.value
-    completedIds.value.push(station.id)
-    saveProgress()
-    refreshStations()
-    collect(station.id) //chance to find a spirit here
-
-    // Area unlocks now come from levelling up (LevelUpNotice)
-    if (completedIds.value.length === stations.length) {
-        celebrate("🏆 You've completed every station!")
+    for (const { place, distance } of pinPlaces.value) {
+        if (!markers.has(place.id)) {
+            const el = createMarkerEl(place)
+            const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+                .setLngLat([place.lng, place.lat])
+                .addTo(map)
+            markers.set(place.id, { el, marker })
+        }
+        const { el } = markers.get(place.id)
+        el.querySelector('.marker-label').textContent = `${place.name} · ${Math.round(distance / 50) * 50} m`
+        el.classList.toggle('is-selected', place.id === selectedId.value)
     }
+
+    map.getSource('zones')?.setData(zonesGeoJson())
+    pins3d.sync(places.value, { kindOf: markerKind, visibleIds, selectedId: selectedId.value })
 }
 
-// dev button to reset progress testing
-function resetProgress() {
-    completedIds.value = []
-    saveProgress()
-    refreshStations()
+// After every pan/zoom: remember where the map is looking, so pinPlaces can update
+function onMapMoved() {
+    const { lng, lat } = map.getCenter()
+    mapCentre.value = [lng, lat]
+    mapZoom.value = map.getZoom()
 }
 
-const distance = computed(() => {
-    if (!selected.value) return 0
-    const from = maplibregl.LngLat.convert(playerPos.value)
-    const to = new maplibregl.LngLat(selected.value.lng, selected.value.lat)
-    return Math.round(from.distanceTo(to))
-})
-
-const walkMinutes = computed(() => Math.max(1, Math.round(distance.value / 60)))
-// how close counts as "arrived": follows GPS accuracy, but never under 40 m or over 70 m
-const arriveRadius = computed(() => {
-    if (fakeMode.value || playerAccuracy.value === null) return 40
-    return Math.min(Math.max(playerAccuracy.value, 40), 70)
-})
-
-const isNear = computed(() => distance.value <= arriveRadius.value)
-
-// const statusText = {
-//     available: '🟢 Available',
-//     completed: '✅ Completed. Well done!',
-//     locked: '🔒 Locked: finish the previous area first',
-// }
-
-const statusText = {
-    available: '🟢 Available',
-    completed: '✅ Completed. Well done!',
+// Keep the user visible above the phone sheet / beside the sidebar
+function mapPadding() {
+    // live journey: no sheet / sidebar, just room for the cards at the top and bottom
+    if (journey.showing) return { top: 230, bottom: 230, left: 0, right: 0 }
+    if (isWide.value) return { left: window.innerWidth >= 1200 ? 460 : 410, top: 0, right: 0, bottom: 0 }
+    const covered = detent.value === 'down' ? 204 : Math.round(window.innerHeight * 0.54)
+    return { left: 0, top: 130, right: 0, bottom: covered }   // top: room for the search bar + locate button
 }
 
-// Locked stations say which level the player needs
-function statusLabel(station) {
-    const status = getStatus(station)
-    if (status === 'locked') {
-        return `🔒 Locked: reach Level ${areaUnlockLevel(station.area)} to unlock`
+function selectPlace(place) {
+    selectedId.value = place.id
+    map.easeTo({ center: [place.lng, place.lat], padding: mapPadding(), duration: 600 })
+}
+
+// ---------- Place preview + directions (components/map/RoutePanel.vue) ----------
+// Tapping a card / pin, or picking from search, shows that place in the sheet / sidebar with
+// "Take me there". The route the panel chooses is drawn on the map with numbered stops
+const destination = ref(null)               // { name, sub, fact, url, lat, lng, placeId? } or null
+let routeStopMarkers = []                    // the numbered circles on the places on the way
+
+function openPlace(place) {
+    selectPlace(place)
+    destination.value = {
+        name: place.name,
+        sub: place.kind === 'mrt' ? `MRT station · ${place.lineCodes.join(' ')}` : place.category,
+        fact: place.fact,
+        url: place.url,
+        lat: place.lat,
+        lng: place.lng,
+        placeId: place.id,
+        spiritHidden: place.spiritHidden,
     }
-    return statusText[status]
+    if (!isWide.value && detent.value === 'down') detent.value = 'middle'
 }
 
-// move the character and remember where they are
-function movePlayer(lngLat) {
-    playerMarker.setLngLat(lngLat)
-    playerPos.value = lngLat
+function closeDestination() {
+    destination.value = null
+    searchMarker?.remove()
+    searchMarker = null
 }
 
-// fake location mode
-function toggleFake() {
-    fakeMode.value = !fakeMode.value
-    if (fakeMode.value) {
-        movePlayer(SMU)
-        map.easeTo({ center: SMU })
+// colour of each part of a route: MRT in its line colour, buses dark, walking grey (dashed)
+function legColour(leg) {
+    if (leg.mode === 'train') return lineColour(leg.line)
+    return leg.mode === 'bus' ? '#3A332D' : '#7A7068'
+}
+
+// the route the panel is showing (or null to clear it): draw it, then fit it on screen
+function showRoute(option) {
+    drawRoute(option)
+    if (option) fitRoute(option)
+}
+
+// draw (or clear, with null) a route: the coloured lines + numbered circles on the stops
+function drawRoute(option) {
+    routeStopMarkers.forEach((m) => m.remove())
+    routeStopMarkers = []
+    const features = (option?.legs ?? []).map((leg) => ({
+        type: 'Feature',
+        properties: { colour: legColour(leg), walk: leg.mode === 'walk' },
+        geometry: { type: 'LineString', coordinates: leg.path },
+    }))
+    map?.getSource('route')?.setData({ type: 'FeatureCollection', features })
+    if (!option) return
+
+    // numbered circles on the MemoryGo places on the way (same numbers as the list)
+    option.onTheWay.forEach((stop, i) => {
+        const el = document.createElement('span')
+        el.className = 'route-stop'
+        el.textContent = String(i + 1)
+        routeStopMarkers.push(new maplibregl.Marker({ element: el, anchor: 'bottom', offset: [0, -52] })
+            .setLngLat([stop.lng, stop.lat]).addTo(map))
+    })
+}
+
+function fitRoute(option) {
+    // fit the whole route in the part of the map the sheet / sidebar doesn't cover. cameraForBounds
+    // already counts the map's own padding (the sheet / sidebar space), so only small margins are added
+    // here: adding the sheet space twice made it give up on phones
+    const bounds = new maplibregl.LngLatBounds()
+    option.legs.forEach((leg) => leg.path.forEach((point) => bounds.extend(point)))
+    const camera = map.cameraForBounds(bounds, {
+        padding: { top: 50, bottom: 30, left: 40, right: 40 },
+        bearing: map.getBearing(),
+    })
+    if (camera) map.easeTo({ center: camera.center, zoom: camera.zoom, duration: 800 })
+    else map.easeTo({ center: bounds.getCenter(), zoom: 12, duration: 800 })
+}
+
+function focusOn({ lng, lat }) {
+    map.easeTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 16), padding: mapPadding(), duration: 600 })
+}
+
+// ---------- Search (components/map/PlaceSearch.vue) ----------
+// Phones: the top bar opens a full-screen search (its mic opens it already listening).
+// iPad / laptop: the search in the sidebar shows a dropdown as you type.
+const searchOpen = ref(false)
+const searchListen = ref(false)
+let searchMarker = null                     // the black pin dropped on an address picked from search
+
+function openSearch(listen) {
+    searchListen.value = listen
+    searchOpen.value = true
+}
+
+// a result was picked: a MemoryGo place is selected like tapping its card; any other address
+// gets a pin and the map flies there (its nearby MemoryGo pins then show around it)
+function onSearchPick(result) {
+    searchOpen.value = false
+    searchMarker?.remove()
+    searchMarker = null
+
+    if (result.kind === 'place') {
+        openPlace(result.place)
+        return
     }
+
+    const el = document.createElement('div')
+    el.className = 'search-pin'
+    const label = document.createElement('span')
+    label.className = 'search-pin-label'
+    label.textContent = result.name
+    const dot = document.createElement('span')
+    dot.className = 'search-pin-dot'
+    el.append(label, dot)
+    searchMarker = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([result.lng, result.lat]).addTo(map)
+
+    selectedId.value = null
+    map.flyTo({ center: [result.lng, result.lat], zoom: Math.max(map.getZoom(), 16), padding: mapPadding(), duration: 1200 })
+    destination.value = { name: result.name, sub: result.address, lat: result.lat, lng: result.lng }
+    if (!isWide.value && detent.value === 'down') detent.value = 'middle'
 }
 
-// bring the camera back to the player
-function recentre() {
-    map.easeTo({ center: playerPos.value, zoom: 17, pitch: 55 })
+// First view: the user at street level, in the part of the map the sheet/sidebar doesn't cover
+// (that's what the padding does). Phones zoom out a little more because only a short strip of map
+// shows above the sheet. (With places all over Singapore, "fit every place" would show the whole island)
+function showNearby() {
+    map.jumpTo({ center: userPos.value, zoom: isWide.value ? 16 : 15.2, padding: mapPadding() })
 }
 
-// dev only: copy the player's exact position, to place stations precisely
-async function copyPosition() {
-    const p = maplibregl.LngLat.convert(playerPos.value)
-    const accuracy = fakeMode.value ? 'fake' : `±${playerAccuracy.value} m`
-    const text = `lat: ${p.lat.toFixed(6)}, lng: ${p.lng.toFixed(6)} (${accuracy})`
+const zoomIn = () => map.zoomIn()
+const zoomOut = () => map.zoomOut()
 
-    try {
-        await navigator.clipboard.writeText(text)
-        alert(`Copied!\n${text}`)
-    } catch {
-        alert(`Couldn't copy, please note it down:\n${text}`)
+function centreOnMe() {
+    map.easeTo({ center: userPos.value, padding: mapPadding(), duration: 600 })
+}
+
+// ---------- Where the user is ----------
+// Until the browser gives a real location, the map shows places around SMU. That fallback used to be
+// silent, so it looked like the app thought you were at Bras Basah. Now the page always says which it is:
+//   'waiting'  asking the browser (first answer usually takes 1-5 s on a phone)
+//   'ok'       real location, blue dot shown
+//   'slow'     no answer yet after 15 s (indoors / underground); still trying
+//   'off'      the user (or the Mac's settings) blocked location
+//   'insecure' the page isn't https or localhost, so the browser never gives a location
+//              (e.g. testing on an iPad through http://192.168.x.x)
+//   'outside'  the location is outside Singapore
+// Step 6: tapping in will only be allowed when this is 'ok'
+const locationStatus = ref('waiting')
+let hasFix = false                           // true once a real location inside Singapore has arrived
+let linkedPlace = false                      // true when opened with ?place= (don't jump away to the user)
+const route = useRoute()
+
+// short on purpose: on a phone the note sits over the map, under the search bar
+const LOCATION_NOTES = {
+    waiting: 'Finding your location…',
+    slow: 'Still finding you · showing SMU area',
+    off: 'Location is off · showing SMU area',
+    insecure: 'Location needs https · showing SMU area',
+    outside: 'Outside Singapore · showing city centre',
+}
+
+function onLocation(position) {
+    const here = [position.coords.longitude, position.coords.latitude]
+
+    // Outside Singapore (e.g. on holiday): the map can't go there, so stay on the city centre
+    // and say why, instead of measuring distances to places hundreds of km away
+    if (!inSingapore(here)) {
+        locationStatus.value = 'outside'
+        return
     }
-}
 
+    locationStatus.value = 'ok'
+    userPos.value = here
+    userMarker.setLngLat(here)
 
-function paperStyle() {
-    for (const layer of map.getStyle().layers) {
-        const id = layer.id
-        const source = layer['source-layer']
-
-        if (layer.type === 'background') {
-            map.setPaintProperty(id, 'background-color', C.land)
-        } else if (layer.type === 'fill') {
-            if (source === 'water') map.setPaintProperty(id, 'fill-color', C.water)
-            else if (source === 'park' || source === 'landcover') {
-                map.setPaintProperty(id, 'fill-color', C.park)
-                map.setPaintProperty(id, 'fill-opacity', 1)
-            }
-            else if (source === 'landuse') map.setPaintProperty(id, 'fill-color', C.landuse)
-            else if (source === 'building') map.setPaintProperty(id, 'fill-color', C.roadEdge)
-        } else if (layer.type === 'line' && source === 'transportation') {
-            const colour = id.includes('casing') ? C.roadEdge : C.road
-            map.setPaintProperty(id, 'line-color', colour)
-        } else if (layer.type === 'symbol') {
-            if (source === 'poi' || source === 'housenumber') {
-                map.setLayoutProperty(id, 'visibility', 'none')
-            }
-            else {
-                map.setPaintProperty(id, 'text-color', C.text)
-                map.setPaintProperty(id, 'text-halo-color', C.textHalo)
-            }
-        } else if (layer.type === 'fill-extrusion') {
-            const height = ['coalesce', ['get', 'render_height'], 8]
-            const pick = ['%', ['round', height], 4]
-            map.setPaintProperty(id, 'fill-extrusion-color',
-                ['match', pick, 0, BUILDING_COLOURS[0], 1, BUILDING_COLOURS[1], 2, BUILDING_COLOURS[2], BUILDING_COLOURS[3]])
-            map.setPaintProperty(id, 'fill-extrusion-height', ['*', 0.35, height])
-            map.setPaintProperty(id, 'fill-extrusion-base', 0)
+    // The first real location replaces SMU: show the blue dot and jump there once
+    // (later updates move the dot, not the map)
+    if (!hasFix) {
+        hasFix = true
+        userMarker.addTo(map)
+        if (!linkedPlace) {
+            showNearby()
+            selectNearest()
         }
     }
 }
 
-onMounted(() => {
-    map = new maplibregl.Map({
-        container: mapE1.value,
-        style: 'https://tiles.openfreemap.org/styles/liberty',
-        center: SMU,
+// error.code: 1 = blocked, 2 = the device can't work it out, 3 = took longer than the timeout.
+// watchPosition keeps trying after 2 and 3, so those only change the note
+function onLocationError(error) {
+    if (error.code === 1) locationStatus.value = 'off'
+    else if (!hasFix) locationStatus.value = 'slow'
+}
+
+// ---------- Tapping in (step 6) ----------
+// The button appears when the user's REAL location is inside a place's zone. If they're inside
+// several zones, it's the nearest one (the server checks the same rules again; this only decides
+// what the button says)
+const router = useRouter()
+const tapInState = ref('idle')               // 'idle' | 'starting'
+const tapInMessage = ref('')                 // the server's reason if it said no
+
+const tapInPlace = computed(() => {
+    if (locationStatus.value !== 'ok') return null
+    return places.value
+        .map((place) => ({ place, distance: distanceM(userPos.value, [place.lng, place.lat]) }))
+        .filter(({ place, distance }) => distance <= place.radiusM)
+        .sort((a, b) => a.distance - b.distance)[0]?.place ?? null
+})
+
+// the small label on the right of the button
+//   inProgress: tapped in but didn't finish (last 30 min) → tapping in again resumes the same paid game
+//   playedToday: finished a paid game here today → a replay earns nothing
+const tapInHint = computed(() => {
+    if (tapInPlace.value?.inProgress) return 'Continue · up to 15'
+    if (tapInPlace.value?.playedToday) return 'Play for fun'
+    return 'Earn up to 15'
+})
+
+// a different place (or none) → clear the old message
+watch(tapInPlace, () => { tapInMessage.value = '' })
+
+async function tapIn() {
+    const place = tapInPlace.value
+    if (!place || tapInState.value === 'starting') return
+    tapInState.value = 'starting'
+    tapInMessage.value = ''
+    try {
+        const [lng, lat] = userPos.value
+        const { data } = await api.post('/visits/start', { placeId: place.id, lat, lng })
+        // the game reads ?visit= and sends its result to /api/visits/:id/finish (lib/gamereward.js)
+        router.push({ path: `/games/${data.game}`, query: { visit: data.visitId, paid: data.paid ? '1' : '0' } })
+    } catch (error) {
+        tapInMessage.value = error.response?.data?.message ?? 'Could not tap in. Please try again.'
+    } finally {
+        tapInState.value = 'idle'
+    }
+}
+
+// ---------- Live journey (stores/journey.js, lib/useJourney.js, components/map/JourneyHud.vue) ----------
+// "Start journey" on a route: the sheet, nav and search hide, the map tilts and follows you, and the
+// card at the top shows the next stop. Inside a stop's zone for 20 s → "You've arrived" → Tap in.
+// The trip lives in a store, so it carries on after the game. Minimise = normal map with a Resume bar
+const journey = useJourneyStore()
+const trip = useJourney(userPos, journey)
+
+const hudTapping = ref(false)
+const hudMessage = ref('')
+const updatingRoute = ref(false)
+
+function startJourney({ mode, option }) {
+    journey.start(destination.value, mode, option)
+    destination.value = null                  // the panel closes; the route stays drawn
+    drawRoute(option)
+    followYou()
+}
+
+function endJourney() {
+    journey.end()
+    drawRoute(null)
+    searchMarker?.remove()
+    searchMarker = null
+    map.easeTo({ center: userPos.value, zoom: 16, pitch: 45, bearing: -20, padding: mapPadding(), duration: 800 })
+}
+
+// the camera during a journey: close, tilted, turned to face the way the route goes
+function followYou() {
+    if (!map || !journey.showing) return
+    map.easeTo({
+        center: userPos.value,
         zoom: 17,
-        pitch: 55,
+        pitch: 60,
+        bearing: trip.heading.value,
+        padding: mapPadding(),
+        duration: 900,
+    })
+}
+
+// "Tap in" on the "You've arrived" card: the same tap in as the button on the map, for that stop
+async function tapInAt(stop) {
+    if (hudTapping.value) return
+    hudTapping.value = true
+    hudMessage.value = ''
+    try {
+        const [lng, lat] = userPos.value
+        const { data } = await api.post('/visits/start', { placeId: stop.id, lat, lng })
+        trip.clearArrived()                   // this stop is done; the next one shows after the game
+        router.push({ path: `/games/${data.game}`, query: { visit: data.visitId, paid: data.paid ? '1' : '0' } })
+    } catch (error) {
+        hudMessage.value = error.response?.data?.message ?? 'Could not tap in. Please try again.'
+    } finally {
+        hudTapping.value = false
+    }
+}
+
+function skipStop() {
+    hudMessage.value = ''
+    trip.clearArrived()
+}
+
+// off the route: ask for a new one from where you are now, the same kind (MRT & bus / walk)
+async function updateRoute() {
+    if (updatingRoute.value || !journey.trip) return
+    updatingRoute.value = true
+    try {
+        const [lng, lat] = userPos.value
+        const { destination: dest, mode } = journey.trip
+        const { data } = await api.get('/route', {
+            params: { from: `${lat},${lng}`, to: `${dest.lat},${dest.lng}`, mode, name: dest.name },
+        })
+        journey.replaceRoute(data.options[0])
+        drawRoute(data.options[0])
+        trip.resetOffRoute()
+    } catch {
+        hudMessage.value = 'Couldn’t get a new route. Keep going, or try again in a moment.'
+    } finally {
+        updatingRoute.value = false
+    }
+}
+
+// during a trip the map follows you as you move
+watch(userPos, () => followYou())
+
+// opening / minimising the journey: tilt in, or settle back to the normal map
+watch(() => journey.showing, (showing) => {
+    if (!map) return
+    if (showing) followYou()
+    else map.easeTo({ pitch: 45, bearing: -20, zoom: 16, padding: mapPadding(), duration: 600 })
+})
+
+// Label the nearest place on the map (or nothing, if none is within 2 km)
+function selectNearest() {
+    selectedId.value = visiblePlaces.value[0]?.place.id ?? null
+}
+
+function placeState(place) {
+    if (place.spiritHidden) return 'undiscovered'
+    return place.visited ? 'collected' : 'playable'
+}
+
+// Ask our server for the places. Markers appear by themselves: places → pinPlaces → refreshMarkers
+async function loadPlaces() {
+    placesStatus.value = 'loading'
+    try {
+        const { data } = await api.get('/places')
+        if (!map) return                     // they left the page while we were waiting
+
+        // The server says which places THIS user has played (visits table):
+        // a Spirit they haven't found hides here → 'undiscovered' (chest pin, dark card) until their first
+        // paid game here finds it; ever played → 'collected' (green pin, sage card, for good); otherwise 'playable'.
+        // place.playedToday decides the card label ("Played today · back tomorrow")
+        places.value = data.places.map((place) => ({ ...place, state: placeState(place) }))
+        placesStatus.value = 'ready'
+
+        // "Show on map" from a Spirit's page (/map?place=12): open that place instead of the nearest one
+        const linked = places.value.find((place) => place.id === Number(route.query.place))
+        if (linked) {
+            linkedPlace = true
+            openPlace(linked)
+        } else {
+            selectNearest()
+        }
+    } catch (error) {
+        console.error(error)
+        placesStatus.value = 'error'
+    }
+}
+
+onMounted(() => {
+    wideQuery.addEventListener('change', onWideChange)
+
+    map = new maplibregl.Map({
+        container: mapEl.value,
+        style: MAP_STYLE_URL,
+        center: SMU,
+        zoom: 16.2,
+        pitch: 45,
         bearing: -20,
+        maxBounds: SINGAPORE_BOUNDS,         // can't pan outside Singapore
+        minZoom: MIN_ZOOM,                   // can't zoom out past the whole island
+        antialias: true,                     // smooth edges on the 3D pins
         attributionControl: { compact: true },
     })
-    map.on('style.load', paperStyle)
+    map.setPadding(mapPadding())
 
-    // add stations
-    for (const station of stations) {
-        const el = document.createElement('div')
-        el.addEventListener('click', () => { selected.value = station })
-        stationEls[station.id] = el
-        drawStationChip(station)
+    // night look: a deep blue tint right above the map picture (shown by styles/night.css after 7 pm),
+    // below the blue dot and the tap areas
+    const nightTint = document.createElement('div')
+    nightTint.className = 'night-tint'
+    map.getCanvas().after(nightTint)
 
-        new maplibregl.Marker({ element: el, anchor: 'bottom' })
-            .setLngLat([station.lng, station.lat])
-            .addTo(map)
-    }
+    showNearby()
+    onMapMoved()
+    map.on('moveend', onMapMoved)
 
-    // Get the player's XP, then redraw stations so the right areas unlock
-    refreshProgress().then(refreshStations).catch(console.error)
-    
-    // add player
-    const playerE1 = document.createElement('div')
-    playerE1.className = 'player-icon'
-    playerE1.textContent = '🧍'
+    // Recolour the map, then add the play zones (dashed circles) under the markers
+    map.on('style.load', () => {
+        applyPaperStyle(map)
+        map.addSource('zones', { type: 'geojson', data: zonesGeoJson() })
+        map.addLayer({
+            id: 'zones-fill',
+            type: 'fill',
+            source: 'zones',
+            paint: { 'fill-color': ['get', 'colour'], 'fill-opacity': 0.28 },
+        })
+        map.addLayer({
+            id: 'zones-line',
+            type: 'line',
+            source: 'zones',
+            paint: { 'line-color': '#161412', 'line-width': 1.6, 'line-dasharray': [3, 3.5] },
+        })
+        // directions: a white outline, then the coloured line (walking parts dashed)
+        map.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
+        map.addLayer({
+            id: 'route-outline',
+            type: 'line',
+            source: 'route',
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: { 'line-color': '#FFFFFF', 'line-width': 10 },
+        })
+        map.addLayer({
+            id: 'route-line',
+            type: 'line',
+            source: 'route',
+            filter: ['!', ['get', 'walk']],
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: { 'line-color': ['get', 'colour'], 'line-width': 6 },
+        })
+        map.addLayer({
+            id: 'route-walk',
+            type: 'line',
+            source: 'route',
+            filter: ['get', 'walk'],
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: { 'line-color': ['get', 'colour'], 'line-width': 5, 'line-dasharray': [0.1, 2] },
+        })
+        map.addLayer(pins3d.layer)           // 3D pins + chests, drawn last so they sit on top
 
-    playerMarker = new maplibregl.Marker({ element: playerE1, anchor: 'bottom' })
-        .setLngLat(SMU)
-        .addTo(map)
-
-    // follow the player's real location
-    watchId = navigator.geolocation.watchPosition(
-        (position) => {
-            playerAccuracy.value = Math.round(position.coords.accuracy)
-            if (position.coords.accuracy > 50) {
-                locationMessage.value = '📡 Weak GPS signal. Your position may be a little off.'
-            } else {
-                locationMessage.value = ''
-            }
-
-            if (fakeMode.value) return
-            const here = [position.coords.longitude, position.coords.latitude]
-            movePlayer(here)
-            map.easeTo({ center: here })
-        },
-        (error) => {
-            locationMessage.value = LOCATION_ERRORS[error.code] || '📍 Something went wrong finding your location.'
-        },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    )
-
-    // fake mode: click the map to teleport
-    map.on('click', (e) => {
-        if (e.originalEvent.target.closest('.station-chip')) return
-        if (!fakeMode.value) return
-        movePlayer(e.lngLat)
-        map.easeTo({ center: e.lngLat })
+        // back from a game in the middle of a journey: draw it again and carry on
+        if (journey.active) {
+            drawRoute(journey.trip.option)
+            followYou()
+        }
     })
 
+    // Places come from the server; their markers are added once they arrive
+    loadPlaces()
+
+    // The user: blue dot with a white ring and a soft halo. It's only put on the map once a real
+    // location arrives (onLocation), so it never sits at SMU pretending to be them
+    const dot = document.createElement('span')
+    dot.className = 'user-dot'
+    userMarker = new maplibregl.Marker({ element: dot }).setLngLat(userPos.value)
+
+    // Follow the real location. Browsers only give it on https pages or localhost
+    if (!window.isSecureContext || !navigator.geolocation) {
+        locationStatus.value = 'insecure'
+    } else {
+        watchId = navigator.geolocation.watchPosition(onLocation, onLocationError, {
+            enableHighAccuracy: true,
+            timeout: 15000,
+        })
+    }
+
+    // Coins live in the `progress` table, behind our Express server
+    api.get('/progress')
+        .then(({ data }) => { coins.value = data.coins })
+        .catch(() => { coins.value = null })
 })
 
 onUnmounted(() => {
-    navigator.geolocation.clearWatch(watchId)
-    clearTimeout(celebrationTimer)
-    map.remove()
+    wideQuery.removeEventListener('change', onWideChange)
+    if (watchId != null) navigator.geolocation.clearWatch(watchId)
+    map?.remove()
+    map = null
+    markers.clear()
+    pins3d.destroy()
 })
 
+// Redraw markers/zones when the filter, location, map position, zoom or selection changes
+watch([pinPlaces, selectedId, mapZoom], refreshMarkers)
+
+// Slide the map when the sheet moves or the screen crosses 768px
+watch([detent, isWide], () => map?.easeTo({ padding: mapPadding(), duration: 340 }))
 </script>
 
 <template>
-   <div class="map-shell">
-        <AppMenu />
+    <div class="map-page">
+        <!-- far-zoom hides the MRT line codes; --pin-scale shrinks the tap areas along with the 3D pins -->
+        <div ref="mapEl" class="map" :class="{ 'far-zoom': mapZoom < SPOTS_ZOOM }"
+            :style="{ '--pin-scale': pinScale(mapZoom) }"></div>
 
-        <!-- "You found a spirit!" popup (opens when foundSpirit is set) -->
-        <SpiritFound :spirit="foundSpirit" @close="dismiss" />
+        <!-- darkens the map when the phone sheet is pulled all the way up -->
+        <div class="dim" :class="{ on: detent === 'up' && !isWide }" aria-hidden="true"></div>
 
-        <div class="map-page">
-        <div ref="mapE1" class="map"></div>
+        <!-- the live journey screen (replaces the search, sheet and nav while it's up) -->
+        <JourneyHud v-if="journey.showing" :trip="journey.trip" :next-stop="journey.nextStop"
+            :arrived="trip.arrived.value" :reached-end="trip.reachedEnd.value" :off-route="trip.offRoute.value"
+            :progress="trip.progress.value" :minutes-left="trip.minutesLeft.value"
+            :next-stop-metres="trip.nextStopMetres.value" :tapping="hudTapping" :message="hudMessage"
+            :updating="updatingRoute"
+            :spirit-here="!!places.find((p) => p.id === trip.arrived.value?.id)?.spiritHidden"
+            @tap-in="tapInAt" @skip="skipStop" @update-route="updateRoute" @end="endJourney"
+            @minimise="journey.minimised = true" />
 
-        <div v-if="locationMessage && !fakeMode" class="location-banner" role="status">
-            {{ locationMessage }}
+        <!-- phone only: search + coins along the top -->
+        <div v-if="!journey.showing" class="topbar">
+            <SearchBar class="topbar-search" @open="openSearch(false)" @mic="openSearch(true)" />
+            <CoinPill :coins="coins" />
         </div>
 
-        <Transition name="pop">
-            <div v-if="celebration" class="celebration" role="status">
-                {{ celebration }}
-            </div>
-        </Transition>
-
-        <div v-if="isDev" class="dev-tools">
-            <button class="dev-btn" @click="toggleFake">
-                📍 Fake location: {{ fakeMode ? 'ON' : 'OFF' }}
-            </button>
-            <button class="dev-btn" @click="resetProgress">
-                🔄 Reset progress
-            </button>
-             <button class="dev-btn" @click="copyPosition">
-                📌 Copy my position
-            </button>
-        </div>
-
-        <button v-if="!selected" class="recentre-btn" @click="recentre">
-            📍 Back to me
-        </button>
-
-        <div v-if="selected" class="station-card">
-        <button class="close-btn" @click="selected=null">x</button>
-        <h2> {{ selected.emoji }} {{ selected.name }}</h2>
-        <p>{{ statusLabel(selected) }}</p>
-
-        <template v-if="getStatus(selected) === 'available'">
-            <p v-if="isNear">You're here! 🎉</p>
-            <p v-else>{{ distance }} m away · about {{ walkMinutes }} min walk</p>            
-            <button class="start-btn" :disabled="!isNear" @click="completeStation">
-                {{ isNear ? 'Start' : 'Walk closer to start' }}
-            </button>
+        <!-- zoomed out too far for pins (they would pile up over the whole island) -->
+        <!-- location problems first (they explain why the map isn't showing where you are) -->
+        <template v-if="!journey.showing">
+            <p v-if="locationStatus !== 'ok'" class="zoom-note" :class="{ 'note-wrap': locationStatus !== 'waiting' }"
+                role="status">
+                {{ LOCATION_NOTES[locationStatus] }}
+            </p>
+            <p v-else-if="placesStatus === 'ready' && mapZoom < MIN_PIN_ZOOM" class="zoom-note" role="status">
+                Zoom in to see places
+            </p>
         </template>
 
+        <!-- phone: one round button under the search bar. iPad/laptop: zoom + locate at the bottom-right -->
+        <div v-if="!journey.showing" class="map-controls">
+            <button type="button" class="round-btn zoom-btn" aria-label="Zoom in" @click="zoomIn">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5 V19 M5 12 H19" /></svg>
+            </button>
+            <button type="button" class="round-btn zoom-btn" aria-label="Zoom out" @click="zoomOut">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12 H19" /></svg>
+            </button>
+            <button type="button" class="round-btn" aria-label="Centre the map on me" @click="centreOnMe">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 L20 20 L12 16 L4 20 Z" /></svg>
+            </button>
+        </div>
+
+        <BottomSheet v-if="!journey.showing" v-model:detent="detent">
+            <template #header>
+                <!-- iPad/laptop only: logo + search live inside the sidebar -->
+                <div class="sidebar-top">
+                    <span class="sidebar-brand"><img :src="appLogo" alt="" class="brand-mark" />MemoryGo</span>
+                    <PlaceSearch variant="dropdown" :places="places" :user-pos="userPos"
+                        :knows-location="locationStatus === 'ok'" @pick="onSearchPick" />
+                </div>
+
+                <!-- a journey running in the background: back to it -->
+                <button v-if="journey.active" type="button" class="resume" @click="journey.minimised = false">
+                    <span class="resume-text">
+                        <span class="resume-title">On your way to {{ journey.trip.destination.name }}</span>
+                        <span class="resume-sub">
+                            {{ journey.nextStop ? `Next: ${journey.nextStop.name}` : `${trip.minutesLeft.value} min left` }}
+                        </span>
+                    </span>
+                    <span class="resume-btn">Resume</span>
+                </button>
+
+                <!-- inside a place's zone: tap in to play its game -->
+                <div v-if="tapInPlace && !journey.active" class="tap-in">
+                    <button type="button" class="tap-in-btn" :disabled="tapInState === 'starting'" @click="tapIn">
+                        <span class="tap-in-dot"></span>
+                        <span class="tap-in-text">
+                            {{ tapInState === 'starting' ? 'Tapping in…' : `Tap in at ${tapInPlace.name}` }}
+                        </span>
+                        <span class="tap-in-hint">{{ tapInHint }}</span>
+                    </button>
+                    <p v-if="tapInMessage" class="tap-in-message" role="alert">{{ tapInMessage }}</p>
+                </div>
+
+                <div v-if="!destination" class="near-row">
+                    <h1 class="near-title">Near <HandUnderline>you</HandUnderline></h1>
+
+                    <div class="filters" role="group" aria-label="Show on map">
+                        <button v-for="f in FILTERS" :key="f.id" type="button" class="filter"
+                            :class="{ active: filter === f.id }" :aria-pressed="filter === f.id"
+                            @click="filter = f.id">
+                            {{ f.label }}
+                        </button>
+                    </div>
+                </div>
+            </template>
+
+            <!-- a place picked: its preview / directions instead of the "Near you" cards -->
+            <div v-if="destination" class="route-scroll">
+                <RoutePanel :destination="destination" :user-pos="userPos" :knows-location="locationStatus === 'ok'"
+                    @close="closeDestination" @show-route="showRoute" @focus="focusOn" @start="startJourney" />
+            </div>
+
+            <!-- while the places load, or if the server can't be reached -->
+            <p v-else-if="placesStatus === 'loading'" class="places-note">Finding places near you…</p>
+            <div v-else-if="placesStatus === 'error'" class="places-note" role="alert">
+                <span>Couldn’t load places. Check your connection and try again.</span>
+                <button type="button" class="retry-btn" @click="loadPlaces">Try again</button>
+            </div>
+
+            <p v-else-if="visiblePlaces.length === 0" class="places-note">
+                No places within 2 km of you. Move the map to explore, or search for somewhere to go.
+            </p>
+
+            <div v-else class="cards" :class="`cards-${cardLayout}`">
+                <PlaceCard v-for="{ place, distance } in visiblePlaces" :key="place.id" :place="place"
+                    :distance="distance" :layout="cardLayout" @select="openPlace" />
+            </div>
+        </BottomSheet>
+
+        <AppNav v-if="!journey.showing" :coins="coins" />
+
+        <!-- phones: full-screen search (covers the map, nav and sheet until a place is picked) -->
+        <div v-if="searchOpen && !isWide" class="search-screen" role="dialog" aria-label="Search for a place">
+            <PlaceSearch variant="screen" :places="places" :user-pos="userPos"
+                :knows-location="locationStatus === 'ok'" :listen-on-open="searchListen"
+                @pick="onSearchPick" @close="searchOpen = false" />
         </div>
     </div>
-   </div>
-
 </template>
 
 <style scoped>
-.map-shell {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    height: 100dvh;
-}
-
+/* =========================================================
+   Page + map
+   ========================================================= */
 .map-page {
-    position: relative;
-    flex: 1;
-    min-height: 0;
-    font-family: 'Nunito', system-ui, sans-serif;
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    background: #EFE9DC;
+    color: var(--ink);
+    font-family: var(--font);
 }
 
 .map {
-    height: 100%;
-    width: 100%;
+    position: absolute;
+    inset: 0;
 }
 
-/* Desktop: leave room for the 250px sidebar */
-@media (min-width: 768px) {
-    .map-page {
-        margin-left: 250px;
-    }
+.dim {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    background: var(--ink);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
 }
 
-/* Phones: leave room for the 70px bottom menu bar */
-@media (max-width: 767px) {
-    .map-shell {
-        padding-bottom: 70px;
-    }
+.dim.on {
+    opacity: 0.25;
 }
 
-:deep(.player-icon) {
-    font-size: 44px;
-    line-height: 1;
-    filter: drop-shadow(0 6px 4px rgba(0, 0, 0, 0.35));
-}
-
-
-:deep(.station-chip) {
+/* ---------- markers (built in JS, so :deep() is needed for scoped styles to reach them) ----------
+   Don't set `position` here: MapLibre makes markers position: absolute to place them on the map */
+.map :deep(.place-marker) {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 6px;
-    padding: 6px 12px 6px 8px;
-    border-radius: 999px;
-    border: 3px solid transparent;
-    background: #fffbf2;
-    color: #2a2017;
-    font-size: 15px;
-    font-weight: 800;
-    white-space: nowrap;
-    cursor: pointer;
-    box-shadow: 0 3px 0 #e8d8b7, 0 6px 14px rgba(110, 67, 41, 0.2);
-}
-
-:deep(.station-emoji) {
-    font-size: 22px;
-}
-
-:deep(.station-chip.available) {
-    border-color: #b5492a;
-}
-
-:deep(.station-chip.completed) {
-    border-color: #3c784d;
-}
-
-:deep(.station-chip.locked) {
-    background: #efe7d6;
-    color: #8a7f70;
-}
-
-.station-card {
-    position: absolute;
-    left: 16px;
-    right: 16px;
-    bottom: 18px;
-    max-width: 440px;
-    margin: 0 auto;
-    z-index: 10;
-    padding: 18px 20px 20px;
-    border-radius: 22px;
-    background: #fffbf2;
-    color: #2a2017;
-    font-size: 18px;
-    box-shadow: 0 4px 0 #e8d8b7, 0 14px 30px rgba(110, 67, 41, 0.25);
-}
-
-.station-card h2 {
-    font-family: 'Fraunces', Georgia, serif;
-    font-size: 24px;
-    margin: 0 0 6px;
-    padding-right: 30px;
-}
-
-.station-card p {
-    margin: 4px 0;
-    color: #4d4134;
-    font-weight: 700;
-}
-
-.close-btn {
-    position: absolute;
-    top: 6px;
-    right: 6px;
-    width: 44px;
-    height: 44px;
-    border: none;
+    padding: 0;
+    border: 0;
     background: none;
-    font-size: 22px;
-    color: #4d4134;
+    cursor: pointer;
 }
 
-.start-btn {
-    width: 100%;
-    margin-top: 14px;
-    padding: 14px;
-    border: none;
-    border-radius: 14px;
-    background: #b5492a;
-    color: white;
-    font-size: 19px;
+/* invisible tap areas the same size as the 3D models (lib/mapPins3d.js draws the pins and their shadows) */
+.map :deep(.marker-hit) {
+    display: block;
+}
+
+.map :deep(.marker-pin) {
+    width: calc(34px * var(--pin-scale, 1));
+    height: calc(46px * var(--pin-scale, 1));
+}
+
+.map :deep(.marker-chest) {
+    width: calc(58px * var(--pin-scale, 1));
+    height: calc(44px * var(--pin-scale, 1));
+}
+
+/* zoomed out: no line-code pills, except on the selected station */
+.map.far-zoom :deep(.place-marker:not(.is-selected) .marker-lines) {
+    display: none;
+}
+
+/* "St Andrew's · 300 m" bubble, only on the selected place */
+.map :deep(.marker-label) {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    display: none;
+    padding: 7px 13px;
+    border-radius: var(--radius-pill);
+    background: var(--ink);
+    color: var(--white);
+    font-family: var(--font);
+    font-size: 15px;
+    font-weight: 700;
+    white-space: nowrap;
+    transform: translateX(-50%);
+}
+
+.map :deep(.marker-label)::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: -5px;
+    width: 11px;
+    height: 11px;
+    margin-left: -5.5px;
+    border-radius: 2px;
+    background: var(--ink);
+    transform: rotate(45deg);
+}
+
+/* "EW13 NS25" pill under MRT pins. Absolute, so the pin's tip still sits exactly on the station */
+.map :deep(.marker-lines) {
+    position: absolute;
+    top: calc(100% + 2px);
+    left: 50%;
+    display: flex;
+    gap: 4px;
+    transform: translateX(-50%);
+    padding: 3px 5px;
+    border: 1.5px solid var(--ink);
+    border-radius: var(--radius-pill);
+    background: var(--white);
+}
+
+.map :deep(.marker-lines span) {
+    padding: 1px 7px;
+    border-radius: var(--radius-pill);
+    color: var(--white);
+    font-family: var(--font);
+    font-size: 12px;
     font-weight: 800;
-    box-shadow: 0 4px 0 #7f2f17;
 }
 
-.start-btn:disabled {
-    background: #e7dcc6;
-    color: #8a7a66;
-    box-shadow: none;
+.map :deep(.place-marker.is-selected) {
+    z-index: 2;
 }
 
-.dev-tools {
+.map :deep(.place-marker.is-selected .marker-label) {
+    display: block;
+}
+
+/* user: blue dot, white ring, soft halo */
+.map :deep(.user-dot) {
+    width: 18px;
+    height: 18px;
+    border: 3.5px solid var(--white);
+    border-radius: 50%;
+    background: var(--user-blue);
+    box-sizing: border-box;
+    box-shadow: 0 0 0 8px rgba(47, 111, 176, 0.18);
+}
+
+/* =========================================================
+   Phone top bar + controls
+   ========================================================= */
+.topbar {
     position: absolute;
     top: 16px;
+    left: 16px;
+    right: 16px;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.topbar-search {
+    flex: 1;
+}
+
+/* phones: full-screen search over everything */
+.search-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    padding: 16px 16px 24px;
+    background: var(--paper);
+    box-sizing: border-box;
+}
+
+/* the pin for an address picked from search (not a MemoryGo place) */
+.map :deep(.search-pin) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;
+}
+
+.map :deep(.search-pin-label) {
+    margin-bottom: 6px;
+    padding: 7px 13px;
+    border-radius: var(--radius-pill);
+    background: var(--white);
+    box-shadow: 0 6px 16px rgba(22, 20, 18, 0.18);
+    color: var(--ink);
+    font-family: var(--font);
+    font-size: 15px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.map :deep(.search-pin-dot) {
+    width: 22px;
+    height: 22px;
+    border: 4px solid var(--white);
+    border-radius: 50%;
+    background: var(--ink);
+    box-shadow: 0 4px 10px rgba(22, 20, 18, 0.3);
+}
+
+/* "Zoom in to see places": under the search bar on phones, bottom-middle of the map on big screens */
+.zoom-note {
+    position: absolute;
+    top: 86px;
+    left: 50%;
+    z-index: 10;
+    margin: 0;
+    padding: 10px 18px;
+    border: var(--glass-border);
+    border-radius: var(--radius-pill);
+    background: var(--glass-strong-bg);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-shadow);
+    font-size: 16px;
+    font-weight: 700;
+    white-space: nowrap;
+    transform: translateX(-50%);
+    pointer-events: none;
+}
+
+/* the longer location messages may need two lines on a phone (and must clear the locate button) */
+.zoom-note.note-wrap {
+    width: max-content;
+    max-width: calc(100% - 128px);
+    border-radius: 20px;
+    text-align: center;
+    white-space: normal;
+}
+
+@media (min-width: 768px) {
+    .zoom-note.note-wrap {
+        max-width: 420px;
+    }
+
+    .zoom-note {
+        top: auto;
+        bottom: 28px;
+        left: calc(50% + 205px);        /* middle of the map part, beside the 410px sidebar */
+    }
+}
+
+@media (min-width: 1200px) {
+    .zoom-note {
+        left: calc(50% + 230px);
+    }
+}
+
+.map-controls {
+    position: absolute;
+    top: 86px;
     right: 16px;
     z-index: 10;
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
-    gap: 8px;
+    gap: 10px;
 }
 
-.dev-btn {
-    padding: 10px 16px;
-    font-size: 16px;
-    font-weight: 700;
-    color: #2a2017;
-    background: #fffbf2;
-    border: none;
-    border-radius: 999px;
-    box-shadow: 0 3px 0 #e8d8b7, 0 6px 14px rgba(110, 67, 41, 0.18);
+.round-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 50px;
+    height: 50px;
+    padding: 0;
+    border: var(--glass-border);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.42);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-shadow);
+    color: var(--ink);
+    cursor: pointer;
 }
 
-.location-banner {
-    position: absolute;
-    top: 16px;
-    left: 16px;
-    z-index: 10;
-    max-width: 420px;
-    padding: 12px 16px;
-    border-radius: 16px;
-    border: 2px solid #f3c54b;
-    background: #fff4d6;
-    color: #4d4134;
-    font-size: 16px;
-    font-weight: 700;
-    line-height: 1.4;
-    box-shadow: 0 3px 0 #e8d8b7, 0 6px 14px rgba(110, 67, 41, 0.18);
+.round-btn svg {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
-.recentre-btn {
-    position: absolute;
-    right: 16px;
-    bottom: 40px;
-    z-index: 10;
-    padding: 12px 18px;
-    font-size: 17px;
-    font-weight: 800;
-    color: #2a2017;
-    background: #fffbf2;
-    border: none;
-    border-radius: 999px;
-    box-shadow: 0 3px 0 #e8d8b7, 0 6px 14px rgba(110, 67, 41, 0.18);
+/* zoom buttons only on big screens (phones pinch to zoom) */
+.zoom-btn {
+    display: none;
 }
 
-.celebration {
-    position: absolute;
-    top: 35%;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 20;
-    padding: 18px 26px;
+/* =========================================================
+   Sheet content
+   ========================================================= */
+.sidebar-top {
+    display: none;
+}
+
+/* ---------- Resume a minimised journey ---------- */
+.resume {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    margin-bottom: 14px;
+    padding: 12px 12px 12px 18px;
+    border: 0;
     border-radius: 22px;
-    background: #b5492a;
-    color: white;
-    font-family: 'Fraunces', Georgia, serif;
-    font-size: 26px;
+    background: var(--user-blue);
+    color: var(--white);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.resume-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.resume-title {
+    overflow: hidden;
+    font-size: 17px;
     font-weight: 700;
-    text-align: center;
-    box-shadow: 0 5px 0 #7f2f17, 0 16px 34px rgba(110, 67, 41, 0.35);
-    width: max-content;
-    max-width: calc(100% - 32px);
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 
-.pop-enter-active,
-.pop-leave-active {
-    transition: opacity 0.3s, transform 0.3s;
+.resume-sub {
+    font-size: 15px;
+    font-weight: 500;
+    opacity: 0.9;
 }
 
-.pop-enter-from,
-.pop-leave-to {
-    opacity: 0;
-    transform: translateX(-50%) scale(0.7);
+.resume-btn {
+    flex-shrink: 0;
+    padding: 10px 16px;
+    border-radius: var(--radius-pill);
+    background: var(--white);
+    color: var(--ink);
+    font-size: 16px;
+    font-weight: 700;
+}
+
+/* ---------- Tap in (inside a place's zone) ---------- */
+.tap-in {
+    margin-bottom: 14px;
+}
+
+.tap-in-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: var(--cta-height);
+    padding: 0 18px;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: var(--ink);
+    color: var(--white);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.tap-in-btn:disabled {
+    opacity: 0.7;
+    cursor: wait;
+}
+
+.tap-in-dot {
+    flex-shrink: 0;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--live-green);
+    box-shadow: 0 0 0 4px rgba(143, 209, 139, 0.3);
+}
+
+.tap-in-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 18px;
+    font-weight: 700;
+    white-space: nowrap;
+    text-overflow: ellipsis;          /* long names: "Tap in at Former Saint Jos…" */
+}
+
+.tap-in-hint {
+    flex-shrink: 0;
+    padding: 4px 10px;
+    border-radius: var(--radius-pill);
+    background: rgba(255, 255, 255, 0.16);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.tap-in-message {
+    margin: 8px 4px 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.near-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.near-title {
+    margin: 0;
+    font-family: var(--font);     /* the app font (not the browser's heading font) */
+    font-size: 34px;
+    font-weight: 700;
+    line-height: 0.95;
+    letter-spacing: -0.045em;
+}
+
+.filters {
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    border-radius: var(--radius-pill);
+    background: rgba(255, 255, 255, 0.5);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.filter {
+    height: var(--tap-min);
+    padding: 0 14px;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.filter.active {
+    background: var(--ink);
+    color: var(--white);
+}
+
+/* ---------- card lists ---------- */
+/* the place preview / directions scroll inside the sheet / sidebar */
+.route-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+/* numbered circles above the pins of the places on the way */
+.map :deep(.route-stop) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: 3px solid var(--white);
+    border-radius: 50%;
+    background: var(--user-blue);
+    box-shadow: 0 4px 10px rgba(22, 20, 18, 0.3);
+    color: var(--white);
+    font-family: var(--font);
+    font-size: 15px;
+    font-weight: 800;
+    pointer-events: none;
+}
+
+/* "Finding places near you…" / "Couldn't load places" */
+.places-note {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin: 0;
+    padding: 4px 20px 20px;
+    font-size: 17px;
+    font-weight: 600;
+}
+
+.retry-btn {
+    min-height: var(--tap-min);
+    padding: 0 20px;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: var(--ink);
+    color: var(--white);
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.cards {
+    display: flex;
+    gap: 12px;
+    scrollbar-width: none;        /* hide the scrollbar (Firefox) */
+}
+
+.cards::-webkit-scrollbar {
+    display: none;                /* hide the scrollbar (Chrome / Safari) */
+}
+
+/* sheet middle/down: swipe sideways, each card snaps into place */
+.cards-rail {
+    align-items: flex-start;
+    padding: 0 20px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-left: 20px;
+}
+
+/* sheet up: vertical list. Bottom padding keeps the last card above the nav */
+.cards-stacked {
+    flex: 1;
+    flex-direction: column;
+    padding: 0 20px 110px;
+    overflow-y: auto;
+}
+
+/* =========================================================
+   iPad + laptop
+   ========================================================= */
+@media (min-width: 768px) {
+    .topbar {
+        display: none;
+    }
+
+    .map-controls {
+        top: auto;
+        right: 24px;
+        bottom: 28px;
+    }
+
+    .round-btn {
+        width: 52px;
+        height: 52px;
+        background: var(--glass-strong-bg);
+    }
+
+    .zoom-btn {
+        display: flex;
+    }
+
+    .sidebar-top {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        margin-bottom: 22px;
+    }
+
+    /* the sidebar's logo + name */
+    .sidebar-brand {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 28px;
+        font-weight: 800;
+        letter-spacing: var(--tracking-tight);
+    }
+
+    .brand-mark {
+        height: 40px;
+        width: auto;
+    }
+
+    .cards-compact {
+        flex: 1;
+        flex-direction: column;
+        padding: 16px 22px 22px;
+        overflow-y: auto;
+    }
 }
 </style>

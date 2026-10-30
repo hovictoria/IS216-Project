@@ -1,5 +1,5 @@
 <script setup>
-import { computed,ref,onBeforeUnmount } from 'vue'
+import { computed, ref, onBeforeUnmount } from 'vue'
 
 const props = defineProps({
     // Heading shown on mobile, e.g. "Memory Match"
@@ -69,23 +69,23 @@ const textToRead = computed(() => props.speech || `${props.title}. ${props.intro
 
     <!-- Header -->
     <header class="game-header d-flex align-items-center justify-content-between px-3 px-md-4 py-3">
-      <router-link :to="exitTo" class="btn btn-pill rounded-pill fw-bold shadow-sm px-3 px-md-4">
+      <router-link :to="exitTo" class="btn btn-pill rounded-pill px-3 px-md-4">
         <i class="fa-solid fa-xmark me-2"></i>Stop
       </router-link>
 
-      <div class="d-none d-md-flex align-items-center gap-2 fs-4 fw-bold serif">
-        <img src="@/assets/app-logo.png" alt="" width="35">
-        <span>Memory Go</span>
+      <div class="brand d-none d-md-flex align-items-center gap-2">
+        <img src="@/assets/app-logo.png" alt="" width="32">
+        <span>MemoryGo</span>
       </div>
 
       <button
         v-if="supported"
         type="button"
-        class="btn btn-pill rounded-pill fw-bold shadow-sm px-3 px-md-4"
+        class="btn btn-pill rounded-pill px-3 px-md-4"
         :aria-pressed="speaking"
         @click="toggle(textToRead)"
       >
-        <i class="fa-solid me-2 text-blue" :class="speaking ? 'fa-stop' : 'fa-volume-high'"></i>
+        <span class="live-dot me-2" :class="{ on: speaking }" aria-hidden="true"></span>
         {{ speaking ? 'Stop reading' : 'Read aloud' }}
       </button>
       <span v-else></span>
@@ -94,13 +94,19 @@ const textToRead = computed(() => props.speech || `${props.title}. ${props.intro
     <main class="game-main mx-auto px-3 pt-2 pt-md-4 pb-5" :class="{ wide }">
 
       <!-- Game introduction -->
-      <div class="text-start text-md-center mb-3">
-        <h1 class="serif fw-bold fs-2 mb-2">
-          <span class="d-md-none">{{ title }}</span>
-          <span class="d-none d-md-inline">{{ desktopTitle }}</span>
+      <div class="game-intro text-start text-md-center mb-4">
+        <h1 class="game-title mb-3">
+          <span class="title-mark">
+            <span class="d-md-none">{{ title }}</span>
+            <span class="d-none d-md-inline">{{ desktopTitle }}</span>
+            <!-- hand-drawn underline, same as the "On your way" / "Cathedral" headings -->
+            <svg viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true">
+              <path d="M2 7 C 25 2.5, 55 2.5, 98 6 M 20 10 C 45 6.5, 70 7.5, 90 10" />
+            </svg>
+          </span>
         </h1>
-        <p class="mb-0 d-md-none" aria-live="polite">{{ intro }}</p>
-        <p class="mb-0 d-none d-md-block" aria-live="polite">{{ desktopIntro || `${title}. ${intro}` }}</p>
+        <p class="game-lead mb-0 d-md-none" aria-live="polite">{{ intro }}</p>
+        <p class="game-lead mb-0 d-none d-md-block" aria-live="polite">{{ desktopIntro || `${title}. ${intro}` }}</p>
       </div>
 
       <slot />
@@ -110,95 +116,209 @@ const textToRead = computed(() => props.speech || `${props.title}. ${props.intro
 </template>
 
 <!-- Shared game styles. Not scoped, so game pages can use .btn-memory, .restart etc.
-     Move this block into your global theme.css if you prefer. -->
+     Tip: move the @import into index.html as a <link> so the font loads sooner. -->
 <style>
+@import url("https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600;700;800&display=swap");
+
 .game-page {
-    --cream: #faf5e6;
-    --ink: #2a1d14;
-    --blue: #3f6190;
-    --green: #4a7c59;
-    --gold: #e5b93c;
-    --red: #b5544a;
+    /* New MemoryGo palette. The old names are kept so each game's own styles still work. */
+    --paper: #f4f0e8;
+    --cream: var(--paper);
+    --ink: #161412;
+    --muted: #5a5148;
+    --peach: #f6c4a4;
+    --accent: #c9673f;      /* terracotta underline colour */
+    --blue: #2f6fb0;
+    --green: #3f8f4e;       /* borders / ticks (readable on light backgrounds) */
+    --green-soft: #e1f2dc;  /* correct-answer background */
+    --green-dot: #8fd18b;   /* the little status dot */
+    --gold: #f3d57c;
+    --gold-deep: #c9a23a;
+    --red: #c9673f;
+    --red-soft: #f8e0d4;    /* wrong-answer background */
+    --line: rgba(22, 20, 18, 0.14);
 
-    background: var(--cream);
+    --glass-bg: rgba(255, 255, 255, 0.82);
+    --glass-border: rgba(255, 255, 255, 0.95);
+    --glass-shadow: inset 0 1px 0 #fff, 0 10px 28px rgba(22, 20, 18, 0.14);
+
+    background: var(--paper);
     color: var(--ink);
+    font-family: 'Inter Tight', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 1.125rem;
+    font-weight: 500;
+    padding-bottom: 2rem;
 }
 
-.game-page .serif {
-    font-family: Georgia, 'Times New Roman', serif;
+.game-page .text-blue { color: var(--blue); }
+.game-page .text-gold { color: var(--gold-deep); }
+
+/* One clear focus ring everywhere (blue has far better contrast than peach on paper) */
+.game-page :focus-visible {
+    outline: 3px solid var(--blue);
+    outline-offset: 3px;
 }
 
-.game-page .text-blue {
-    color: var(--blue);
+/* ---------- Header ---------- */
+.game-page .game-header { background: transparent; }
+
+.game-page .brand {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.05em;
 }
 
-.game-page .text-gold {
-    color: var(--gold);
-}
-
-/* Header */
-.game-page .game-header {
-    background: #efe8d4;
-    border-bottom: 1px solid #e0d8c0;
-}
-
-@media (max-width: 767.98px) {
-    .game-page .game-header {
-        background: transparent;
-        border-bottom: none;
-    }
-}
-
-.game-page .game-main {
-    max-width: 440px;
-}
-
-/* Bootstrap button colour overrides */
+/* Glass pill buttons (Stop, Read aloud) */
 .game-page .btn-pill {
     --bs-btn-color: var(--ink);
-    --bs-btn-bg: #fffdf6;
-    --bs-btn-border-color: #e3dcc6;
+    --bs-btn-bg: var(--glass-bg);
+    --bs-btn-border-color: var(--glass-border);
     --bs-btn-hover-color: var(--ink);
     --bs-btn-hover-bg: #fff;
-    --bs-btn-hover-border-color: #e3dcc6;
+    --bs-btn-hover-border-color: #fff;
     --bs-btn-active-color: var(--ink);
     --bs-btn-active-bg: #fff;
-    --bs-btn-active-border-color: #e3dcc6;
+    --bs-btn-active-border-color: #fff;
+    min-height: 48px;
+    display: inline-flex;
+    align-items: center;
+    font-weight: 700;
+    -webkit-backdrop-filter: blur(20px) saturate(170%);
+    backdrop-filter: blur(20px) saturate(170%);
+    box-shadow: var(--glass-shadow);
 }
 
+.game-page .live-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--ink);
+    opacity: 0.35;
+}
+.game-page .live-dot.on {
+    background: var(--green-dot);
+    opacity: 1;
+}
+
+/* ---------- Heading ---------- */
+.game-page .game-main { max-width: 440px; }
+
+.game-page .game-title {
+    font-size: clamp(2.1rem, 8vw, 2.6rem);
+    font-weight: 700;
+    line-height: 0.98;
+    letter-spacing: -0.045em;
+}
+.game-page .title-mark {
+    position: relative;
+    display: inline-block;
+    padding-bottom: 4px;
+}
+.game-page .title-mark svg {
+    position: absolute;
+    left: -2%;
+    bottom: -9px;
+    width: 104%;
+    height: 12px;
+}
+.game-page .title-mark path {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 2.8;
+    stroke-linecap: round;
+}
+.game-page .game-lead {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #3a332d;
+}
+
+/* ---------- Primary button: black pill with a green dot (like "Tap in") ---------- */
 .game-page .btn-memory {
-    --bs-btn-color: var(--blue);
-    --bs-btn-bg: #fffdf6;
-    --bs-btn-border-color: var(--blue);
-    --bs-btn-border-width: 2px;
-    --bs-btn-hover-color: var(--blue);
-    --bs-btn-hover-bg: #fff;
-    --bs-btn-hover-border-color: var(--blue);
-    --bs-btn-active-color: var(--blue);
-    --bs-btn-active-bg: #fff;
-    --bs-btn-active-border-color: var(--blue);
-    --bs-btn-disabled-color: var(--blue);
-    --bs-btn-disabled-bg: #fffdf6;
-    --bs-btn-disabled-border-color: var(--blue);
-    border-radius: 14px;
+    --bs-btn-color: #fff;
+    --bs-btn-bg: var(--ink);
+    --bs-btn-border-color: var(--ink);
+    --bs-btn-border-width: 0;
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: #000;
+    --bs-btn-hover-border-color: #000;
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: #000;
+    --bs-btn-active-border-color: #000;
+    --bs-btn-disabled-color: #fff;
+    --bs-btn-disabled-bg: var(--ink);
+    --bs-btn-disabled-border-color: var(--ink);
+    --bs-btn-disabled-opacity: 0.35;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 60px;
+    border-radius: 999px;
+    font-size: 1.2rem;
+    font-weight: 700;
+    transition: transform 0.08s;
+}
+.game-page .btn-memory:active:not(:disabled) { transform: translateY(2px); }
+/* the dot only shows when the button has no icon of its own */
+.game-page .btn-memory:not(:has(i))::before {
+    content: '';
+    width: 9px;
+    height: 9px;
+    margin-right: 0.65rem;
+    border-radius: 50%;
+    background: var(--green-dot);
 }
 
+/* "Start again" becomes an underlined text link (like "About this place") */
 .game-page .restart {
-    --bs-btn-color: var(--blue);
-    --bs-btn-hover-color: var(--blue);
+    --bs-btn-color: var(--ink);
+    --bs-btn-hover-color: #000;
+    min-height: 48px;
+    font-weight: 700;
+    text-decoration: underline !important;
+    text-decoration-thickness: 2px !important;
+    text-underline-offset: 5px;
 }
 
-/* Shared check badge */
+/* ---------- Shared bits ---------- */
+/* Correct tick */
 .game-page .check {
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
     background: var(--green);
     color: #fff;
     font-size: 11px;
 }
+
+/* Reusable surfaces for game tiles and answer buttons */
+.game-page .g-tile {
+    background: #fff;
+    border: 1.5px solid var(--line);
+    border-radius: 20px;
+    box-shadow: 0 2px 8px rgba(22, 20, 18, 0.06);
+}
+.game-page .g-option {
+    background: #fff;
+    border: 2px solid var(--ink);
+    border-radius: 20px;
+}
+.game-page .g-option:hover:not(:disabled) { background: #fffaf3; box-shadow: 0 0 0 2px var(--ink); }
+.game-page .g-option.correct { background: var(--green-soft); border-color: var(--green); }
+.game-page .g-option.wrong { background: var(--red-soft); border-color: var(--red); }
+
+/* ---------- Desktop: content sits on a soft glass sheet ---------- */
 @media (min-width: 768px) {
-    .game-page .game-main.wide {
-        max-width: 800px;
+    .game-page .game-main {
+        background: rgba(255, 255, 255, 0.6);
+        border: 1px solid var(--glass-border);
+        border-radius: 32px;
+        box-shadow: 0 10px 28px rgba(22, 20, 18, 0.08);
+        padding: 2rem 2.25rem 2.5rem !important;
     }
+    .game-page .game-main.wide { max-width: 800px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .game-page .btn-memory { transition: none; }
 }
 </style>
