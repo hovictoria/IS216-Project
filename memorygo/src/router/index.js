@@ -29,6 +29,9 @@ import mapView from "../views/map.vue"
 /* Profile */
 import profile from "../views/profile.vue"
 
+/* Admin */
+import admin from "../views/admin.vue"
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -46,8 +49,8 @@ const router = createRouter({
       component: signup
     },
     {
-      path: "/games",
-      component: memory
+      path: "/admin",
+      component: admin
     },
     {
       // the old dashboard was removed; old links land on the Journey tab instead

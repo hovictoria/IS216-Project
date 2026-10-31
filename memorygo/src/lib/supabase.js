@@ -21,5 +21,5 @@ if (!url || !key) {
 //   Closing the tab or refreshing the page signs the user out, so every visit starts at login.
 //   To remember users again, delete the options object (Supabase saves to localStorage by default).
 export const supabase = createClient(url, key, {
-    auth: { persistSession: false },
+    auth: { persistSession: true },
 })

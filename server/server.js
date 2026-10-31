@@ -22,6 +22,7 @@ import visitsRoutes from './routes/visits.js'
 import searchRoutes from './routes/search.js'
 import routeRoutes from './routes/route.js'
 import journeyRoutes from './routes/journey.js'
+import adminRoutes from './routes/admin.js'
 
 const PORT = Number(process.env.PORT) || 8000
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173' 
@@ -50,7 +51,7 @@ app.use('/api/search', searchRoutes)
 app.use('/api/route', routeRoutes)
 app.use('/api/journey', journeyRoutes)
 
-
+app.use('/api/admin', adminRoutes)
 
 
 // Quick check the server is up. No login needed.

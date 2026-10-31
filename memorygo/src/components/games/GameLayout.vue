@@ -96,9 +96,7 @@ const textToRead = computed(() => props.speech || `${props.title}. ${props.intro
       <div class="game-intro text-start text-md-center mb-4">
         <h1 class="game-title mb-3">
           <span class="title-mark">
-            <span class="d-md-none">{{ title }}</span>
-            <span class="d-none d-md-inline">{{ desktopTitle }}</span>
-            <!-- hand-drawn underline, same as the "On your way" / "Cathedral" headings -->
+            <span>{{ title }}</span>
             <svg viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true">
               <path d="M2 7 C 25 2.5, 55 2.5, 98 6 M 20 10 C 45 6.5, 70 7.5, 90 10" />
             </svg>
