@@ -64,6 +64,11 @@ imports:    AuthLayout.vue, ui/TextField.vue, ui/PrimaryButton.vue, ui/HandUnder
                     autocomplete="current-password" />
             </div>
 
+            <!-- Forgot password link -->
+            <p class="forgot">
+                <router-link to="/forgot-password" class="link">Forgot password?</router-link>
+            </p>
+
             <!-- Display any error messages within a <p> tag if exists -->
             <p v-if="error" class="error" role="alert">{{ error }}</p>
 
@@ -108,6 +113,12 @@ imports:    AuthLayout.vue, ui/TextField.vue, ui/PrimaryButton.vue, ui/HandUnder
         flex-direction: column;
         gap: 14px;
         margin-top: 22px;
+    }
+
+    .forgot {
+        margin: 4px 0 0;
+        text-align: right;
+        font-size: 17px;
     }
 
     .error {

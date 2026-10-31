@@ -5,10 +5,29 @@ import { api } from '@/lib/api'
 import { stations } from '@/data/stations'
 import { levelFromXp, progressToNext } from '@/config/progression'
 import AppNav from '@/components/ui/AppNav.vue'   // the app's nav (the old sidebar menu was removed)
+import EditProfile from '@/components/profile/EditProfile.vue'
+import DeleteAccount from '@/components/profile/DeleteAccount.vue'
 import { useRouter } from "vue-router";
 
 const auth = useAuthStore()
 const router = useRouter();
+
+// Edit profile pop-up
+const editing = ref(false)
+
+// Delete account pop-up
+const deleting = ref(false)
+
+function openDelete() {
+  editing.value = false
+  deleting.value = true
+}
+
+// "Keep my account" goes back to the Edit Profile pop-up they came from
+function closeDelete() {
+  deleting.value = false
+  editing.value = true
+}
 
 // Username
 const displayName = computed(() => {
@@ -133,8 +152,9 @@ async function onSignOut() {
   router.push("/");
 }
 
+// only reload when a different user signs in (editing the name or password changes auth.user too)
 watch(
-  () => auth.user,
+  () => auth.user?.id,
   () => {
     loadStationProgress()
     loadProfileProgress()
@@ -171,8 +191,18 @@ watch(
           <span v-else class="level-tag">
             ⭐ Level unavailable
           </span>
+
+          <div>
+            <button type="button" class="edit-btn" @click="editing = true">
+              <i class="fa-solid fa-pen" aria-hidden="true"></i>
+              Edit profile
+            </button>
+          </div>
         </div>
       </section>
+
+      <!-- edit name and password -->
+      <EditProfile v-if="editing" @close="editing = false" @delete="openDelete" />
 
       <!-- level progress -->
       <section class="profile-card">
@@ -290,6 +320,8 @@ watch(
       </button>
     </div>
   </main>
+
+  <DeleteAccount v-if="deleting" @close="closeDelete" />
 </template>
 
 <style scoped>
@@ -373,6 +405,25 @@ watch(
   border-radius: 999px;
   font-weight: 800;
 }
+
+.edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-top: 12px;
+  padding: 0 18px;
+  border: 2px solid var(--blue, #3b5f94);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--blue, #3b5f94);
+  font-weight: 800;
+}
+
+.edit-btn:hover {
+  background: #f3f6fb;
+}
+
 
 .section-heading,
 .station-heading {
