@@ -5,27 +5,16 @@
 //             2. const isLoggedIn  = a boolean derived from user. It is used under router/index.js for redirect guards
 //             3. function init     = restores a saved session on startup and then keeps user updated for rest of the app's life through a listener
 //             4. function signIn   = helps with signin. Sends email and password variables to Supabase and reports back
+//             5. function sendPasswordReset / updatePassword = forgot password: email a reset link, then save the new password
+//             6. function deleteAccount = checks the password, then asks the server (DELETE /api/me) to delete the account
 // imports:    imports supabase to use supabase methods. Imports defineStore from pinia
 // ----------------------------------------------------------------------------------------------------------
 
-// ----------------------------------------------------------------------------------------------------------
-// useAuthStore()
-//  1. const user
-//      - returns a Supabase user object [null when logged out]
-//  2. const isLoggedIn
-//      - a boolean variable to check if a user isLoggedIn
-//      - used in src/router/index.js to check if there is a protected guard for that page whenever the user switches page, 'to'
-//  3. function init()
-//      - function to check if user has a saved session
-//      - used in main.js before app runs to check if the user has a stored saved session within the browser
-//  4. function signIn()
-//      - function to signIn 
-//      - used in login.vue for user error validation during signIn
-// ----------------------------------------------------------------------------------------------------------
 
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { supabase } from '@/lib/supabase'
+import { api } from '@/lib/api'
 
 // Pinia "setup store"
 export const useAuthStore = defineStore('auth', () => {
@@ -67,6 +56,78 @@ export const useAuthStore = defineStore('auth', () => {
         return "We couldn't create your account. Please check your details and try again."
     }
 
+    // Helps with forgot password: Supabase emails a link that opens /reset-password
+    // Returns null on success, or a friendly message to show the user
+    async function sendPasswordReset(email) {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${window.location.origin}/reset-password`,
+        })
+        if (!error) return null
+        return "We couldn't send the email just now. Please wait a minute and try again."
+    }
+
+    // Saves a new password. The reset link has already signed the user in
+    // Returns null on success, or a friendly message to show the user
+    async function updatePassword(password) {
+        const { error } = await supabase.auth.updateUser({ password })
+        if (!error) return null
+
+        if (error.message.toLowerCase().includes('different')) {
+            return 'Please choose a password you have not used before.'
+        }
+        if (error.message.toLowerCase().includes('password')) {
+            return 'Please choose a longer password (at least 6 characters).'
+        }
+        return "We couldn't save your new password. Please ask for a new reset link."
+    }
+
+    // Edit profile: change the name shown around the app (saved on the user as display_name)
+    async function updateName(displayName) {
+        const { data, error } = await supabase.auth.updateUser({ data: { display_name: displayName } })
+        if (error) return "We couldn't save your name. Please try again."
+
+        user.value = data.user      // show the new name straight away
+        return null
+    }
+
+    // Edit profile: change password. Checks the current password first by signing in with it
+    async function changePassword(currentPassword, newPassword) {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+            email: user.value.email,
+            password: currentPassword,
+        })
+        if (signInError) return 'Your current password is not correct. Please try again.'
+
+        const { error } = await supabase.auth.updateUser({ password: newPassword })
+        if (!error) return null
+
+        if (error.message.toLowerCase().includes('different')) {
+            return 'Your new password must be different from your current one.'
+        }
+        if (error.message.toLowerCase().includes('password')) {
+            return 'Please choose a longer password (at least 6 characters).'
+        }
+        return "We couldn't change your password. Please try again."
+    }
+
+    async function deleteAccount(password) {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+            email: user.value.email,
+            password,
+        })
+        if (signInError) return 'That password is not correct. Please try again.'
+
+        try {
+            await api.delete('/me')
+        } catch {
+            return "We couldn't delete your account just now. Please try again later."
+        }
+
+        // forget this player's saved map stations in this browser too
+        try { localStorage.removeItem(`memorygo-stations-${user.value.id}`) } catch { /* storage blocked */ }
+        return null
+    }
+
     // Helps with the signOut
     async function signOut() {
         await supabase.auth.signOut()
@@ -85,5 +146,8 @@ export const useAuthStore = defineStore('auth', () => {
         })
     }
 
-    return { user, isLoggedIn, init, signIn, signUp, signOut }
+    return {
+        user, isLoggedIn, init, signIn, signUp, signOut,
+        sendPasswordReset, updatePassword, updateName, changePassword, deleteAccount
+    }
 })

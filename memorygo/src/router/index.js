@@ -6,6 +6,8 @@ import { checkMood } from '../lib/useMood'
 import landing from "../components/auth/landing.vue"
 import login from "../components/auth/login.vue"
 import signup from "../components/auth/signup.vue"
+import forgot from "../components/auth/forgot.vue"
+import reset from "../components/auth/reset.vue"
 
 
 /* Games */
@@ -47,6 +49,16 @@ const router = createRouter({
     {
       path: "/signup",
       component: signup
+    },
+    // Forgot password: no requiresAuth, the user can't sign in yet
+    {
+      path: "/forgot-password",
+      component: forgot
+    },
+    {
+      // opened from the link in the reset email (set as redirectTo in stores/auth.js)
+      path: "/reset-password",
+      component: reset
     },
     {
       path: "/admin",
