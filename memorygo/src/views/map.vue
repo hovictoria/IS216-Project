@@ -37,6 +37,7 @@ import AppNav from '@/components/ui/AppNav.vue'
 import CoinPill from '@/components/ui/CoinPill.vue'
 import HandUnderline from '@/components/ui/HandUnderline.vue'
 import appLogo from '@/assets/app-logo.png'
+import { lessMotion } from '@/lib/useSettings'
 
 // Used until the browser gives us a real location (or if location is turned off)
 const SMU = [103.8502, 1.2963]
@@ -138,7 +139,7 @@ let watchId = null
 const markers = new Map()                    // place id -> { el, marker } for the pins on screen now
 
 // The 3D pins and chests, drawn by three.js inside the map (lib/mapPins3d.js)
-const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+const reducedMotion = lessMotion()   // the Me page's switch, or the device's setting
 const pins3d = createPins3d({ reducedMotion })
 
 // Which 3D model a place gets (DESIGN_SPEC.md section 5, "Map markers")

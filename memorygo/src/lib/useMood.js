@@ -9,7 +9,10 @@
 //               night look as soon as they open another page
 //             - to preview (or present) either look at any time, open a page with ?mood=night or ?mood=day;
 //               ?mood=auto goes back to the clock. The choice is remembered in this browser only
-// usage:      startMood() once in main.js; checkMood() to look at the clock again; `mood` ('day' | 'night') for any page that needs it in code;
+//             - the Mood setting on the Me page (Auto / Morning / Night) calls setMood, and is saved to the
+//               account too (lib/useSettings.js), so it follows the user to other devices
+// usage:      startMood() once in main.js; checkMood() to look at the clock again; setMood('auto' | 'day' | 'night');
+//             `mood` ('day' | 'night') for any page that needs it in code;
 //             `greeting` = 'Good morning' / 'Good afternoon' / 'Good evening' (evening whenever it's night)
 // ----------------------------------------------------------------------------------------------------------
 
@@ -57,3 +60,17 @@ export function startMood() {
     chosen = chosenMood()
     checkMood()
 }
+
+// The Mood setting on the Me page: 'auto' (follow the clock), 'day' or 'night'.
+// Saved in the same place as ?mood=, so the choice is there straight away next time the app opens
+export function setMood(choice) {
+    chosen = choice === 'day' || choice === 'night' ? choice : null
+    try {
+        if (chosen) localStorage.setItem(SAVE_KEY, chosen)
+        else localStorage.removeItem(SAVE_KEY)
+    } catch { /* storage blocked (private window): still works until the tab closes */ }
+    checkMood()
+}
+
+// true when this page was opened with ?mood= (a demo): the saved Mood setting shouldn't undo it
+export const moodFromLink = () => new URLSearchParams(window.location.search).has('mood')

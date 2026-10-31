@@ -1,8 +1,19 @@
+<!--------------------------------------------------------------------------------------------------------
+PSEUDOCODE
+filename:   components/profile/DeleteAccount.vue
+purpose:    - "Delete account?": type your password to confirm, then the account and everything saved for it
+              is deleted (auth.deleteAccount → DELETE /api/me)
+            - after: "Account deleted" with OK, which signs out and goes to the landing page
+            - the logic is the original Delete account code; only the look changed (same frame as Edit profile)
+emits:      close ("Keep my account" goes back to Edit profile)
+---------------------------------------------------------------------------------------------------------->
+
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import TextField from '@/components/ui/TextField.vue'
+import MeSheet from './MeSheet.vue'
 
 const emit = defineEmits(['close'])
 const auth = useAuthStore()
@@ -41,217 +52,137 @@ async function finish() {
 </script>
 
 <template>
-  <Teleport to="body">
-    <div class="popup-overlay" @keydown.esc="!deleted && emit('close')">
+    <!-- Goodbye, after the account is deleted (can't be closed: OK signs out) -->
+    <MeSheet v-if="deleted" label-id="bye-title" @close="finish">
+        <template #title>Account deleted</template>
+        <p class="lead">Your account and progress have been deleted. Thank you for exploring with MemoryGo.</p>
+        <template #actions>
+            <button type="button" class="main-btn" @click="finish">OK</button>
+        </template>
+    </MeSheet>
 
-      <!-- Goodbye, after the account is deleted -->
-      <div v-if="deleted" class="popup-card text-center" role="dialog" aria-modal="true" aria-labelledby="bye-title">
-        <div class="popup-icon green" aria-hidden="true"><i class="fa-solid fa-check"></i></div>
-        <h2 id="bye-title">Account deleted</h2>
-        <p class="lead-text">Your account and progress have been deleted. Thank you for exploring with MemoryGo.</p>
-        <button type="button" class="main-btn" @click="finish">OK</button>
-      </div>
-
-      <!-- Are you sure? -->
-       <!-- ".prevent" stops the browser’s default behaviour of reloading the page -->
-      <form v-else class="popup-card" role="dialog" aria-modal="true" aria-labelledby="delete-title"
-        novalidate @submit.prevent="confirmDelete">
-        <div class="popup-heading">
-          <h2 id="delete-title">Delete account?</h2>
-          <button type="button" class="close-btn" aria-label="Close" @click="emit('close')">
-            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-          </button>
-        </div>
+    <!-- Are you sure? -->
+    <MeSheet v-else label-id="delete-title" @close="emit('close')">
+        <template #title>Delete account?</template>
 
         <div class="warning">
-          <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-          <p>
-            This <strong>cannot be undone</strong>. You will lose your level, XP, coins,
-            Memory Spirits and everywhere you have visited.
-          </p>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3 L22 20 H2 Z M12 9.5 V14 M12 17 V17.2" />
+            </svg>
+            <p>
+                This <strong>cannot be undone</strong>. You will lose your level, XP, coins,
+                Spirits and everywhere you have visited.
+            </p>
         </div>
 
-        <TextField id="delete-password" v-model="password" label="Type your password to confirm"
-          type="password" autocomplete="current-password" />
+        <!-- ".prevent" stops the browser's default behaviour of reloading the page -->
+        <form id="delete-form" novalidate @submit.prevent="confirmDelete">
+            <TextField id="delete-password" v-model="password" label="Type your password to confirm"
+                type="password" autocomplete="current-password" />
+            <p v-if="error" class="form-error" role="alert">{{ error }}</p>
+        </form>
 
-        <p v-if="error" class="form-error" role="alert">{{ error }}</p>
-
-        <button type="submit" class="danger-btn" :disabled="deleting">
-          {{ deleting ? 'Deleting…' : 'Delete my account' }}
-        </button>
-        <button type="button" class="keep-btn" @click="emit('close')">Keep my account</button>
-      </form>
-
-    </div>
-  </Teleport>
+        <template #actions>
+            <div class="delete-actions">
+                <button type="submit" form="delete-form" class="danger-btn" :disabled="deleting">
+                    {{ deleting ? 'Deleting…' : 'Delete my account' }}
+                </button>
+                <button type="button" class="keep-btn" @click="emit('close')">Keep my account</button>
+            </div>
+        </template>
+    </MeSheet>
 </template>
 
 <style scoped>
-.popup-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1050;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  background: rgba(42, 32, 24, 0.55);
+.lead {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.4;
 }
 
-.popup-card {
-  width: 100%;
-  max-width: 440px;
-  max-height: calc(100vh - 32px);
-  overflow-y: auto;
-  padding: 24px;
-  background: #fffbf0;
-  border: 2px solid #d8cba8;
-  border-radius: 22px;
-  color: #2a2018;
-  font-family: 'Nunito Sans', sans-serif;
-  box-shadow: 0 18px 40px rgba(42, 32, 24, 0.3);
-  animation: card-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.popup-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.popup-card h2 {
-  margin: 0;
-  font-family: 'Fraunces', Georgia, serif;
-  font-size: 1.8rem;
-  font-weight: 700;
-}
-
-.close-btn {
-  width: 48px;
-  height: 48px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid #2a2018;
-  border-radius: 50%;
-  background: #fff;
-  color: #2a2018;
-  font-size: 1.3rem;
-}
-
-/* What they will lose */
 .warning {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  margin-bottom: 18px;
-  padding: 14px 16px;
-  border-radius: 14px;
-  background: #f8e1d8;
-  color: #8a3519;
-  font-size: 1.05rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px 18px;
+    border-radius: 20px;
+    background: var(--error-bg);
+    color: var(--error-ink);
 }
 
-.warning i {
-  margin-top: 4px;
-  font-size: 1.3rem;
+.warning svg {
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 .warning p {
-  margin: 0;
+    margin: 0;
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 1.4;
 }
 
 .form-error {
-  margin: 14px 0 0;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: #f8e1d8;
-  color: #8a3519;
-  font-weight: 700;
+    margin: 10px 0 0;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: var(--error-bg);
+    color: var(--error-ink);
+    font-size: 16px;
+    font-weight: 700;
 }
 
-/* Red: the dangerous action */
+/* buttons: one above the other on phones, side by side on bigger screens (Keep on the left) */
+.delete-actions {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 12px;
+}
+
+@media (min-width: 768px) {
+    .delete-actions {
+        flex-direction: row-reverse;
+    }
+}
+
+.keep-btn,
+.danger-btn,
+.main-btn {
+    flex: 1;
+    min-height: var(--cta-height);
+    padding: 0 20px;
+    border-radius: var(--radius-pill);
+    font-size: 18px;
+    font-weight: 800;
+}
+
+.keep-btn {
+    border: 1.5px solid var(--ink);
+    background: transparent;
+    color: var(--ink);
+}
+
 .danger-btn {
-  width: 100%;
-  min-height: 52px;
-  margin-top: 18px;
-  border: 0;
-  border-radius: 16px;
-  background: #b23a2a;
-  color: #fff;
-  font-size: 1.1rem;
-  font-weight: 800;
-  box-shadow: 0 4px 0 #7f2519;
-}
-
-.danger-btn:active {
-  transform: translateY(2px);
-  box-shadow: 0 2px 0 #7f2519;
+    border: 0;
+    background: #B23A1E;
+    color: var(--white);
 }
 
 .danger-btn:disabled {
-  opacity: 0.6;
-}
-
-/* The safe choice, just as easy to tap */
-.keep-btn {
-  width: 100%;
-  min-height: 52px;
-  margin-top: 12px;
-  border: 2px solid #2a2018;
-  border-radius: 16px;
-  background: #fff;
-  color: #2a2018;
-  font-size: 1.1rem;
-  font-weight: 800;
-}
-
-/* Goodbye message */
-.popup-icon {
-  width: 72px;
-  height: 72px;
-  margin: 0 auto 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  color: #fff;
-  font-size: 2rem;
-}
-
-.popup-icon.green {
-  background: #4f7f55;
-}
-
-.lead-text {
-  margin: 8px 0 0;
-  font-size: 1.15rem;
-  color: #6b5d4d;
+    opacity: 0.6;
 }
 
 .main-btn {
-  width: 100%;
-  min-height: 52px;
-  margin-top: 20px;
-  border: 0;
-  border-radius: 16px;
-  background: #a64f31;
-  color: #fff;
-  font-size: 1.1rem;
-  font-weight: 800;
-  box-shadow: 0 4px 0 #7d3a22;
-}
-
-@keyframes card-pop {
-  from { transform: scale(0.85); opacity: 0; }
-  to   { transform: scale(1);    opacity: 1; }
-}
-
-/* Players who turn off motion in their device settings get no animation */
-@media (prefers-reduced-motion: reduce) {
-  .popup-card { animation: none; }
+    border: 0;
+    background: var(--ink);
+    color: var(--white);
 }
 </style>

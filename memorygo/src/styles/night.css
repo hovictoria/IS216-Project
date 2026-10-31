@@ -98,28 +98,32 @@ html.night .night-tint {
 }
 
 /* =========================================================
-   Journey tab + Spirits tab: darker blurred map, indigo + blue glows,
+   Journey, Spirits and Me tabs: darker blurred map, indigo + blue glows,
    light headings, glass cards more solid (about 80%) so dark text stays readable
    ========================================================= */
 html.night .journey-page,
-html.night .spirits-page {
+html.night .spirits-page,
+html.night .me-page {
     background: var(--night-sky);
 }
 
 html.night .journey-page .backdrop-map,
-html.night .spirits-page .backdrop-map {
+html.night .spirits-page .backdrop-map,
+html.night .me-page .backdrop-map {
     filter: blur(18px) saturate(1.1) brightness(0.52);
     opacity: 0.7;
 }
 
 html.night .journey-page .glow-peach,
-html.night .spirits-page .glow-lilac {
+html.night .spirits-page .glow-lilac,
+html.night .me-page .glow-peach {
     background: var(--night-indigo);
     opacity: 0.55;
 }
 
 html.night .journey-page .glow-sage,
-html.night .spirits-page .glow-peach {
+html.night .spirits-page .glow-peach,
+html.night .me-page .glow-sage {
     background: var(--night-blue);
     opacity: 0.5;
 }
@@ -136,8 +140,44 @@ html.night .spirits-page .eyebrow,
 html.night .spirits-page .title,
 html.night .spirits-page .note,
 html.night .spirits-page .progress-label,
-html.night .spirits-page .collection-title {
+html.night .spirits-page .collection-title,
+html.night .me-page .wordmark,
+html.night .me-page .note {
     color: var(--night-text);
+}
+
+/* Me page on phones: the name, joined date and level sit straight on the background
+   (on laptops they're inside the profile card, which stays light) */
+@media (max-width: 1023px) {
+    html.night .me-page .name,
+    html.night .me-page .joined,
+    html.night .me-page .level-note {
+        color: var(--night-text);
+    }
+
+    html.night .me-page .xp-bar {
+        background: rgba(244, 240, 232, 0.2);
+    }
+
+    html.night .me-page .stats {
+        background: rgba(255, 255, 255, 0.8);
+    }
+
+    html.night .me-page .sign-out {
+        border-color: var(--night-text);
+        color: var(--night-text);
+        background: rgba(255, 255, 255, 0.08);
+    }
+}
+
+@media (min-width: 1024px) {
+    html.night .me-page .profile {
+        background: rgba(246, 196, 164, 0.88);
+    }
+
+    html.night .me-page .sign-out {
+        background: rgba(255, 255, 255, 0.8);
+    }
 }
 
 /* Spirits progress bar on the dark background */
@@ -151,6 +191,7 @@ html.night .spirits-page .progress-fill {
 
 /* glass cards: more solid at night */
 html.night .journey-page .box,
+html.night .me-page .glass-card,
 html.night .spirits-page .set-card,
 html.night .spirits-page .sets-card,
 html.night .spirits-page .tile {
@@ -158,6 +199,7 @@ html.night .spirits-page .tile {
 }
 
 html.night .journey-page .challenge,
+html.night .me-page .glass-card.peach,
 html.night .spirits-page .newest {
     background: rgba(246, 196, 164, 0.88);
 }

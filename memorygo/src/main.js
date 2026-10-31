@@ -1,4 +1,4 @@
-import { createApp } from 'vue'
+import { createApp, watch } from 'vue'
 import { createPinia } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 
@@ -19,9 +19,14 @@ import '@/styles/base.css'
 import '@/styles/legacy.css'
 // night look (7 pm to 6 am): lib/useMood.js adds class="night" to <html>, styles/night.css styles it
 import '@/styles/night.css'
+// the Me page's settings (text size, reduce motion, solid backgrounds): lib/useSettings.js adds classes to <html>
+import '@/styles/settings.css'
 import { startMood } from '@/lib/useMood'
+import { startSettings } from '@/lib/useSettings'
+import { useProfileStore } from '@/stores/profile'
 
 startMood()
+startSettings()                     // this browser's copy of the settings, until the account's copy arrives
 
 const app = createApp(App)
 app.use(createPinia())
@@ -32,4 +37,8 @@ const auth = useAuthStore()         // useAuthStore is from the stores/auth.js p
 auth.init().then(() => {
     app.use(router)                 //installs the router
     app.mount('#app')               // renders the first page
+
+    // whenever someone signs in (or was already signed in): load their picture + settings from the account
+    const profile = useProfileStore()
+    watch(() => auth.user?.id, (id) => (id ? profile.load() : profile.clear()), { immediate: true })
 })

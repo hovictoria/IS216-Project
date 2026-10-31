@@ -13,6 +13,8 @@ note:       Journey points to the Journey tab (views/journey.vue); the old /menu
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useProfileStore } from '@/stores/profile'
+import { pictureOf } from '@/lib/spiritPictures'
 import CoinPill from './CoinPill.vue'
 
 defineProps({
@@ -20,6 +22,7 @@ defineProps({
 })
 
 const auth = useAuthStore()
+const profile = useProfileStore()           // the Spirit they picked as their picture (Me → Edit profile)
 const route = useRoute()
 
 // a page under a tab (e.g. /spirits/kopi) keeps that tab highlighted
@@ -71,7 +74,10 @@ const tabs = [
 
         <!-- big screens only: coins + avatar sit beside the tabs -->
         <CoinPill :coins="coins" class="nav-coins" />
-        <router-link to="/me" class="avatar" aria-label="Your profile">{{ initial }}</router-link>
+        <router-link to="/me" class="avatar" aria-label="Your profile">
+            <img v-if="profile.avatarSpiritId" :src="pictureOf(profile.avatarSpiritId)" alt="" class="avatar-spirit" />
+            <template v-else>{{ initial }}</template>
+        </router-link>
     </nav>
 </template>
 
@@ -133,6 +139,13 @@ const tabs = [
 .nav-coins,
 .avatar {
     display: none;
+}
+
+/* their Spirit, when they picked one as their picture */
+.avatar-spirit {
+    width: 78%;
+    height: 78%;
+    object-fit: contain;
 }
 
 /* =========================================================

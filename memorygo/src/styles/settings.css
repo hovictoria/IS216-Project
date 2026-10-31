@@ -1,0 +1,102 @@
+/* ----------------------------------------------------------------------------------------------------------
+PSEUDOCODE
+filename:   styles/settings.css
+purpose:    what the Me page's settings do to the whole app. lib/useSettings.js puts a class on <html>:
+            - text-large / text-larger: every page is drawn 12% / 25% bigger (CSS zoom), except the map
+              itself, which already zooms with fingers and gets confused by CSS zoom
+            - reduce-motion: animations and transitions finish at once (same as the device setting in base.css)
+            - solid: the see-through glass cards become plain paper with a thin outline (easier to read,
+              lighter for older phones). Coloured cards keep their colour, just not see-through
+imports:    loaded once in main.js, after night.css
+---------------------------------------------------------------------------------------------------------- */
+
+/* =========================================================
+   Text size
+   ========================================================= */
+html.text-large { --text-zoom: 1.12; }
+html.text-larger { --text-zoom: 1.25; }
+
+/* #app > ... = the page; body > ... = pop-ups that are moved to the end of <body> (Teleport) */
+html.text-large #app > :not(.map-page),
+html.text-larger #app > :not(.map-page),
+html.text-large body > :not(#app),
+html.text-larger body > :not(#app) {
+    zoom: var(--text-zoom);
+}
+
+/* =========================================================
+   Reduce motion (the user's switch; the device's setting is in base.css)
+   ========================================================= */
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+}
+
+/* =========================================================
+   Solid backgrounds
+   ========================================================= */
+html.solid {
+    --glass-light-bg: #FBF8F2;
+    --glass-strong-bg: #FBF8F2;
+    --glass-blur: none;
+    --glass-border: 1px solid #E6DED0;
+}
+
+/* no blur anywhere */
+html.solid *,
+html.solid *::before {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+}
+
+/* white glass → paper */
+html.solid .glass-card,
+html.solid .app-nav .tabs,
+html.solid .coin-pill,
+html.solid .map-page .search,
+html.solid .map-page .field,
+html.solid .map-page .sheet,
+html.solid .map-page .card,
+html.solid .map-page .bottom,
+html.solid .map-page .zoom-note,
+html.solid .map-page .round-btn,
+html.solid .journey-page .box:not(.challenge):not(.trip),
+html.solid .spirits-page .set-card,
+html.solid .spirits-page .sets-card,
+html.solid .spirits-page .tile:not(.locked),
+html.solid .auth--landing .step {
+    background: #FBF8F2 !important;
+    border: 1px solid #E6DED0 !important;
+}
+
+/* Me page: the stats strip (phone) and the profile card (laptop) */
+@media (max-width: 1023px) {
+    html.solid .me-page .stats {
+        background: #FBF8F2 !important;
+        border: 1px solid #E6DED0 !important;
+    }
+}
+
+@media (min-width: 1024px) {
+    html.solid .me-page .profile {
+        background: var(--peach) !important;
+    }
+}
+
+/* coloured glass → the same colour, not see-through */
+html.solid .glass-card.peach,
+html.solid .journey-page .challenge,
+html.solid .spirits-page .newest {
+    background: var(--peach) !important;
+}
+
+html.solid .journey-page .tone-peach { background: var(--peach) !important; }
+html.solid .journey-page .tone-sage { background: var(--sage) !important; }
+html.solid .journey-page .tone-butter { background: var(--butter) !important; }
+html.solid .journey-page .tone-lilac { background: var(--lilac) !important; }
+html.solid .journey-page .tone-sky { background: #A9CDE8 !important; }
+html.solid .journey-page .tone-coral { background: #E9A08C !important; }

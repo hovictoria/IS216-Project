@@ -317,6 +317,29 @@ Spirits (design: `~/Downloads/MemoryGo-spirits-handoff 2`, 24 Spirits in 6 area 
       always shows; only /login and /signup skip to /map when signed in. `components/auth/landing.vue` swaps
       its buttons when signed in: "Continue exploring" (→ /map) + "Not you? Sign out" (stays on the landing,
       which switches back to "Start exploring" / "I already have an account")
+- [ ] Me tab, step 1 (built 2026-10-31, waiting on `docs/me.sql` + a real test). From `MemoryGo-me-handoff`,
+      trimmed with the user: no photo upload (pick one of your Spirits instead), no daily reminder, no arrival
+      buzz, no weather, no Family & safety, Language = English placeholder, no help line. Laptop = layout "A"
+      (profile column 400px left, settings right, Sign out pinned to the bottom so both columns end level)
+      - `views/me.vue` (/me): Spirit picture or initial (+ newest Spirit peeking), name with underline,
+        "Explorer since", Level chip + XP bar (config/progression.js), coins · Spirits x/24 · places,
+        Spirits companion → /spirits, My kakis (placeholder until step 2), settings, Account rows, Sign out.
+        Replaces `views/profile.vue` (no longer routed; teammate's file, not deleted)
+      - settings: `lib/useSettings.js` + `styles/settings.css`. Text size = CSS zoom 1 / 1.12 / 1.25 on every
+        page except the map itself (16px stays the smallest, so no "small"); reduce motion = class + lessMotion()
+        (AuthLayout, ChestCanvas, SpiritCanvas, map, journey now use it); solid = glass → paper (#FBF8F2);
+        mood = useMood.setMood (Auto / Morning / Night; a ?mood= link still wins for demos). Applied at once,
+        kept in this browser, saved to the account in the background
+      - `components/profile/`: MeSheet.vue (frame: full page on phones with "← Me", 600px pop-up from 768px,
+        Esc + focus kept inside), EditProfile.vue (Spirit picker + name + Delete link), ChangePassword.vue
+        (split out, + "Email me a reset link"), DeleteAccount.vue. The checks/saves are the teammate's code;
+        only the look changed
+      - `stores/profile.js` (loaded on sign-in in main.js; the nav's round picture shows the picked Spirit),
+        `lib/spiritPictures.js`
+      - server `routes/me.js`: GET /api/me/profile, PUT /api/me/avatar (only a Spirit you found),
+        PUT /api/me/settings (each value checked). `docs/me.sql`: profiles + user_settings, RLS on,
+        on delete cascade (Delete account cleans them up)
+      - night look: Me added to night.css
 - [ ] Journey tab (built, waiting on `docs/journey.sql` + a real test)
       - decisions (2026-10-30): today's challenge = finish paid games at 2 places today → +50 coins once a day;
         Puzzle of the day = one of our 6 games (same for everyone, turns each day) paying the game's coins + 20

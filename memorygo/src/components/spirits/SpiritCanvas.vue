@@ -13,6 +13,7 @@ props:      spiritId ('kopi', 'chilli-crab', ...), color, label (read out by scr
 import { onMounted, onBeforeUnmount, ref } from 'vue'
 import * as THREE from 'three'
 import { buildSpirit, addSpiritLights, addSpiritShadow } from '@/three/spiritModel'
+import { lessMotion } from '@/lib/useSettings'
 
 const props = defineProps({
     spiritId: { type: String, required: true },
@@ -25,7 +26,7 @@ let renderer, scene, camera, model, removeShadow, frameId, resizeObserver
 
 onMounted(() => {
     const el = host.value
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const reduceMotion = lessMotion()   // the Me page's switch, or the device's setting
 
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))

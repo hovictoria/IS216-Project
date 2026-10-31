@@ -28,8 +28,8 @@ import journeyView from "../views/journey.vue"
 /* Map */
 import mapView from "../views/map.vue" 
 
-/* Profile */
-import profile from "../views/profile.vue"
+/* Me tab (the new design; the first Me page, views/profile.vue, is no longer used) */
+import meView from "../views/me.vue"
 
 /* Admin */
 import admin from "../views/admin.vue"
@@ -91,7 +91,7 @@ const router = createRouter({
     }, 
     {
       path: "/me",
-      component: profile,
+      component: meView,
       meta: {requiresAuth: true}
     },
     {

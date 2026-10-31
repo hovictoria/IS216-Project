@@ -1,62 +1,83 @@
+<!--------------------------------------------------------------------------------------------------------
+PSEUDOCODE
+filename:   components/profile/EditProfile.vue
+purpose:    - Edit profile (Me handoff 04 / laptop 02): pick one of your Spirits as your picture + your name,
+              and the way to Delete account at the bottom
+            - the name check and save are the original Edit Profile code (auth.updateName); the picture is
+              saved by our server (PUT /api/me/avatar), which checks you really found that Spirit
+            - no Spirits yet → your initial, and a button to the map to go find one
+            - after saving: an "Updated!" message with OK, like before
+            - Change password moved to its own screen (ChangePassword.vue)
+emits:      close, delete (opens DeleteAccount.vue)
+---------------------------------------------------------------------------------------------------------->
+
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useProfileStore } from '@/stores/profile'
+import { pictureOf } from '@/lib/spiritPictures'
 import TextField from '@/components/ui/TextField.vue'
+import PrimaryButton from '@/components/ui/PrimaryButton.vue'
+import HandUnderline from '@/components/ui/HandUnderline.vue'
+import MeSheet from './MeSheet.vue'
 
 const emit = defineEmits(['close', 'delete'])
 const auth = useAuthStore()
+const profile = useProfileStore()
+const router = useRouter()
 
 // starts as the current name
 const savedName = auth.user?.user_metadata?.display_name ?? ''
 const name = ref(savedName)
 const nameError = ref('')
 
-// both boxes empty = keep the current password
-const currentPassword = ref('')
-const newPassword = ref('')
-const passwordError = ref('')
+// starts as the current picture (null = their initial)
+const savedSpirit = profile.avatarSpiritId
+const spirit = ref(savedSpirit)
+const spiritError = ref('')
 
 const saving = ref(false)       // toggles the Save button while saving
 const generalError = ref('')    // e.g. nothing was changed
 
-// The "updated" pop-up: holds its message while it is open
+// The "updated" message: holds its text while it shows
 const popup = ref('')
 
-// Checks both parts before saving anything, so a mistake in one doesn't half-save the other
-function checkForm(nameChanged, passwordChanged) {
-    if (nameChanged) {
-        const trimmed = name.value.trim()
-        if (!trimmed) nameError.value = 'Please type your name.'
-        else if (trimmed.length > 40) nameError.value = 'Please keep your name under 40 letters.'
-    }
+// the Spirits they've found, newest first ('kopi' → "Kopi", 'chilli-crab' → "Chilli crab")
+const foundSpirits = computed(() => (profile.data?.foundSpiritIds ?? []).map((id) => ({
+    id,
+    name: id.charAt(0).toUpperCase() + id.slice(1).replace(/-/g, ' '),
+})))
 
-    if (passwordChanged) {
-        if (!currentPassword.value || !newPassword.value) {
-            passwordError.value = 'Please type both your current password and your new password.'
-        } else if (newPassword.value.length < 6) {
-            passwordError.value = 'Please choose a longer password (at least 6 characters).'
-        } else if (newPassword.value === currentPassword.value) {
-            passwordError.value = 'Your new password must be different from your current one.'
-        }
-    }
+const initial = computed(() => (name.value.trim() || auth.user?.email || '?').charAt(0).toUpperCase())
 
-    return !nameError.value && !passwordError.value
+// tap the picked Spirit again to go back to your initial
+function pick(id) {
+    spirit.value = spirit.value === id ? null : id
+}
+
+// Checks the name before saving anything
+function checkName() {
+    const trimmed = name.value.trim()
+    if (!trimmed) nameError.value = 'Please type your name.'
+    else if (trimmed.length > 40) nameError.value = 'Please keep your name under 40 letters.'
+    return !nameError.value
 }
 
 async function save() {
     nameError.value = ''
-    passwordError.value = ''
+    spiritError.value = ''
     generalError.value = ''
 
     const nameChanged = name.value.trim() !== savedName
-    const passwordChanged = Boolean(currentPassword.value || newPassword.value)
+    const spiritChanged = spirit.value !== savedSpirit
 
-    if (!nameChanged && !passwordChanged) {
+    if (!nameChanged && !spiritChanged) {
         generalError.value = "You haven't changed anything yet."
         return
     }
-    // if theres is a mistake in the form, it will return nothing and stop the save
-    if (!checkForm(nameChanged, passwordChanged)) return
+    // if there is a mistake in the form, stop the save
+    if (nameChanged && !checkName()) return
 
     saving.value = true
     const updated = []
@@ -67,318 +88,279 @@ async function save() {
         else updated.push('name')
     }
 
-    if (passwordChanged) {
-        const message = await auth.changePassword(currentPassword.value, newPassword.value)
-        if (message) {
-            passwordError.value = updated.length ? `${message} (Your name was saved.)` : message
-        } else {
-            updated.push('password')
-            currentPassword.value = ''
-            newPassword.value = ''
-        }
+    if (spiritChanged) {
+        const message = await profile.setAvatar(spirit.value)
+        if (message) spiritError.value = updated.length ? `${message} (Your name was saved.)` : message
+        else updated.push('picture')
     }
 
     saving.value = false
 
-    // show the pop-up once is done saving
-    if (!nameError.value && !passwordError.value) {
+    // show the message once everything is saved
+    if (!nameError.value && !spiritError.value) {
         popup.value = updated.length === 2
-            ? 'Your name and password have been updated.'
+            ? 'Your name and picture have been updated.'
             : `Your ${updated[0]} has been updated.`
     }
 }
 
-// everything is saved close the edit pop-up
-function finish() {
-    popup.value = ''
+function goFindOne() {
     emit('close')
+    router.push('/map')
 }
 </script>
 
 <template>
-  //moves it to the end of body (allow the pop-up to be at the very font layer)
-  <Teleport to="body">
-  <!-- hidden once everything is saved, so only the "Updated" pop-up shows -->
-  <div v-if="!popup" class="popup-overlay" @keydown.esc="emit('close')">
-  <section class="edit-card" role="dialog" aria-modal="true" aria-labelledby="edit-title">
-    <div class="edit-heading">
-      <h2 id="edit-title">Edit Profile</h2>
-      <button type="button" class="close-btn" aria-label="Close" @click="emit('close')">
-        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-      </button>
-    </div>
-    <!-- ".prevent" stops the browser’s default behaviour of reloading the page -->
-    <form novalidate @submit.prevent="save">
-      <!-- Name -->
-      <div class="edit-part">
-        <h3>Your name</h3>
-        <!-- autocomplete tells the browser's password manager what each box is for:
-        "current-password": the password they already have → the browser can fill in the saved one
-        "new-password": a brand new password → the browser won't fill in the old one here,
-        and may suggest a strong password and offer to save it. It doesn't change how the page looks; it only helps the browser fill in the right box -->
-
-        <TextField id="edit-name" v-model="name" label="Name" autocomplete="name" />
-        <p v-if="nameError" class="form-error" role="alert">{{ nameError }}</p>
-      </div>
-
-      <!-- Password -->
-      <div class="edit-part">
-        <h3>Change password</h3>
-        <p class="hint top">Leave these empty to keep your current password.</p>
-        <div class="fields">
-          <TextField id="edit-current-password" v-model="currentPassword" label="Current password"
-            type="password" autocomplete="current-password" />
-          <TextField id="edit-new-password" v-model="newPassword" label="New password"
-            type="password" autocomplete="new-password" />
+    <!-- "Updated!" after saving -->
+    <MeSheet v-if="popup" label-id="updated-title" @close="emit('close')">
+        <template #title>Updated!</template>
+        <div class="done">
+            <span class="done-tick" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M5 12.5 L10 17 L19 7" /></svg>
+            </span>
+            <p class="done-text">{{ popup }}</p>
         </div>
-        <p class="hint">At least 6 characters.</p>
-        <p v-if="passwordError" class="form-error" role="alert">{{ passwordError }}</p>
-      </div>
+        <template #actions>
+            <PrimaryButton type="button" @click="emit('close')">OK</PrimaryButton>
+        </template>
+    </MeSheet>
 
-      <p v-if="generalError" class="form-error" role="alert">{{ generalError }}</p>
+    <MeSheet v-else label-id="edit-title" @close="emit('close')">
+        <template #title>Edit <HandUnderline>profile</HandUnderline></template>
 
-      <!-- One Save button for both parts -->
-      <button type="submit" class="save-btn" :disabled="saving">
-        {{ saving ? 'Saving…' : 'Save changes' }}
-      </button>
-    </form>
+        <!-- ".prevent" stops the browser's default behaviour of reloading the page -->
+        <form id="edit-form" novalidate @submit.prevent="save">
+            <!-- Picture: one of your Spirits -->
+            <section class="picture-card">
+                <div class="current">
+                    <span class="avatar" aria-hidden="true">
+                        <img v-if="spirit" :src="pictureOf(spirit)" alt="" />
+                        <template v-else>{{ initial }}</template>
+                    </span>
+                    <div>
+                        <p class="card-title">Profile picture</p>
+                        <p class="card-note">
+                            {{ foundSpirits.length ? 'Pick one of your Spirits.' : 'Find your first Spirit to use it as your picture.' }}
+                        </p>
+                    </div>
+                </div>
 
-    <div class="delete-row">
-      <button type="button" class="delete-btn" @click="emit('delete')">
-        <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
-        Delete account
-      </button>
-    </div>
-  </section>
-  </div>
-  </Teleport>
+                <div v-if="foundSpirits.length" class="spirit-row" role="radiogroup" aria-label="Your Spirits">
+                    <button v-for="s in foundSpirits" :key="s.id" type="button" class="spirit-choice"
+                        :class="{ picked: spirit === s.id }" role="radio" :aria-checked="spirit === s.id"
+                        :aria-label="s.name" @click="pick(s.id)">
+                        <img :src="pictureOf(s.id)" alt="" />
+                    </button>
+                </div>
+                <button v-else type="button" class="outline-btn" @click="goFindOne">Find Spirits on the map</button>
 
-  <!-- "Updated" pop-up, replaces the edit pop-up after saving -->
-  <Teleport to="body">
-    <Transition name="popup">
-      <!-- ".self" clicking the dark background closes it -->
-      <div v-if="popup" class="popup-overlay on-top" @click.self="finish">
-        <div class="popup-card" role="dialog" aria-modal="true" aria-labelledby="popup-title">
-          <div class="popup-tick" aria-hidden="true"><i class="fa-solid fa-check"></i></div>
-          <h2 id="popup-title">Updated!</h2>
-          <p>{{ popup }}</p>
-          <button type="button" class="save-btn" @click="finish">OK</button>
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
+                <p v-if="spiritError" class="form-error" role="alert">{{ spiritError }}</p>
+            </section>
+
+            <!-- Name -->
+            <!-- autocomplete="name" tells the browser this box is a person's name, so it can offer to fill it -->
+            <div>
+                <TextField id="edit-name" v-model="name" label="Your name" autocomplete="name" />
+                <p class="hint">This is the name shown around the app.</p>
+                <p v-if="nameError" class="form-error" role="alert">{{ nameError }}</p>
+            </div>
+
+            <p v-if="generalError" class="form-error" role="alert">{{ generalError }}</p>
+        </form>
+
+        <button type="button" class="delete-link" @click="emit('delete')">Delete my account</button>
+
+        <template #actions>
+            <button type="button" class="outline-btn sheet-cancel" @click="emit('close')">Cancel</button>
+            <PrimaryButton type="submit" form="edit-form" :disabled="saving">
+                {{ saving ? 'Saving…' : 'Save changes' }}
+            </PrimaryButton>
+        </template>
+    </MeSheet>
 </template>
 
 <style scoped>
-/* Edit pop-up card: scrolls inside itself on short phone screens */
-.edit-card {
-  width: 100%;
-  max-width: 460px;
-  max-height: calc(100vh - 32px);
-  overflow-y: auto;
-  padding: 24px;
-  background: #fffbf0;
-  border: 2px solid #d8cba8;
-  border-radius: 22px;
-  color: #2a2018;
-  font-family: 'Nunito Sans', sans-serif;
-  box-shadow: 0 18px 40px rgba(42, 32, 24, 0.3);
-  /* cubic-bezier: controls the speed of an animation as it plays  (start timing(x), startpush(), endtiming, endpush)
-  (a custom speed curve for the animation, and because one value is above 1, the popup slightly overshoots and bounces into place) */
-  animation: card-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
 }
 
-.edit-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
+/* =========================================================
+   Picture card (peach glass)
+   ========================================================= */
+.picture-card {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 20px;
+    border: var(--glass-border);
+    border-radius: var(--radius-card);
+    background: rgba(246, 196, 164, 0.45);
+    box-shadow: var(--glass-shadow);
 }
 
-.edit-heading h2 {
-  margin: 0;
-  font-family: 'Fraunces', Georgia, serif;
-  font-size: 1.8rem;
-  font-weight: 700;
+.current {
+    display: flex;
+    align-items: center;
+    gap: 16px;
 }
 
-.close-btn {
-  width: 48px;
-  height: 48px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid #2a2018;
-  border-radius: 50%;
-  background: #fff;
-  color: #2a2018;
-  font-size: 1.3rem;
+.avatar {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 88px;
+    height: 88px;
+    overflow: hidden;
+    border: 4px solid var(--white);
+    border-radius: 50%;
+    background: var(--peach);
+    font-size: 36px;
+    font-weight: 800;
 }
 
-.edit-part {
-  margin-top: 22px;
-  padding-top: 22px;
-  /* reads a colour from a saved variable, with a backup colour in case 
-  the variable doesn’t exist */
-  border-top: 2px dashed var(--dash, #d8cba8);
+.avatar img {
+    width: 78%;
+    height: 78%;
+    object-fit: contain;
 }
 
-.edit-part h3 {
-  margin: 0 0 12px;
-  font-size: 1.15rem;
-  font-weight: 800;
+.card-title {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 800;
 }
 
-.fields {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+.card-note {
+    margin: 4px 0 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--muted);
 }
 
+/* a row of round Spirit pictures that scrolls sideways */
+.spirit-row {
+    display: flex;
+    gap: 10px;
+    margin: 0 -4px;
+    padding: 4px;
+    overflow-x: auto;
+}
+
+.spirit-choice {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    padding: 0;
+    border: 3px solid transparent;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.8);
+}
+
+.spirit-choice img {
+    width: 82%;
+    height: 82%;
+    object-fit: contain;
+}
+
+.spirit-choice.picked {
+    border-color: var(--ink);
+}
+
+/* =========================================================
+   Text + buttons
+   ========================================================= */
 .hint {
-  margin: 8px 0 0;
-  color: var(--ink-soft, #6b5d4d);
-  font-size: 1rem;
-}
-
-.hint.top {
-  margin: -4px 0 12px;
+    margin: 8px 0 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--muted);
 }
 
 .form-error {
-  margin: 14px 0 0;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: var(--error-bg, #f8e1d8);
-  color: var(--error-ink, #8a3519);
-  font-weight: 700;
+    margin: 8px 0 0;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: var(--error-bg);
+    color: var(--error-ink);
+    font-size: 16px;
+    font-weight: 700;
 }
 
-.save-btn {
-  width: 100%;
-  min-height: 52px;
-  margin-top: 16px;
-  border: 0;
-  border-radius: 16px;
-  background: var(--terracotta, #a64f31);
-  color: #fff;
-  font-size: 1.1rem;
-  font-weight: 800;
-  box-shadow: 0 4px 0 var(--terracotta-deep, #7d3a22);
+.outline-btn {
+    min-height: var(--cta-height);
+    padding: 0 26px;
+    border: 1.5px solid var(--ink);
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--ink);
+    font-size: 18px;
+    font-weight: 800;
 }
 
-.save-btn:active {
-  /* moves the element down by 2px, without affecting anything around it */
-  transform: translateY(2px);
-  box-shadow: 0 2px 0 var(--terracotta-deep, #7d3a22);
+.picture-card .outline-btn {
+    align-self: flex-start;
+    min-height: var(--tap-min);
+    font-size: 17px;
 }
 
-.save-btn:disabled {
-  opacity: 0.6;
+.sheet-cancel {
+    flex-shrink: 0;
 }
 
-.delete-row {
-  margin-top: 22px;
-  padding-top: 14px;
-  border-top: 2px dashed var(--dash, #d8cba8);
-  text-align: center;
+.delete-link {
+    align-self: flex-start;
+    min-height: var(--tap-min);
+    margin-top: 6px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--error-ink);
+    font-size: 17px;
+    font-weight: 700;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 5px;
 }
 
-.delete-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 0 16px;
-  border: 0;
-  background: none;
-  color: #b23a2a;
-  font-weight: 800;
-  text-decoration: underline;
-  text-underline-offset: 4px;
+/* =========================================================
+   "Updated!"
+   ========================================================= */
+.done {
+    display: flex;
+    align-items: center;
+    gap: 16px;
 }
 
-/* Pop-up */
-.popup-overlay {
-  position: fixed;
-  /* makes the element stretch to cover its whole container */
-  inset: 0;
-  z-index: 1050;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  background: rgba(42, 32, 24, 0.55);
+.done-tick {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--sage);
 }
 
-/* the "Updated" pop-up sits above the edit pop-up */
-.popup-overlay.on-top {
-  z-index: 1060;
+.done-tick svg {
+    width: 28px;
+    height: 28px;
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
-.popup-card {
-  width: 100%;
-  max-width: 360px;
-  padding: 28px 24px 24px;
-  text-align: center;
-  background: #fffbf0;
-  border: 2px solid #d8cba8;
-  border-radius: 22px;
-  color: #2a2018;
-  font-family: 'Nunito Sans', sans-serif;
-  box-shadow: 0 18px 40px rgba(42, 32, 24, 0.3);
-}
-
-.popup-card h2 {
-  margin: 0 0 6px;
-  font-family: 'Fraunces', Georgia, serif;
-  font-size: 1.8rem;
-  font-weight: 700;
-}
-
-.popup-card p {
-  margin: 0;
-  font-size: 1.15rem;
-  color: #6b5d4d;
-}
-
-.popup-tick {
-  width: 72px;
-  height: 72px;
-  margin: 0 auto 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: #4f7f55;
-  color: #fff;
-  font-size: 2rem;
-  /* (name, duration, delay, fill-mode (control how it looks before and after))*/
-  animation: tick-pop 0.5s 0.1s both;
-}
-
-.popup-enter-active,
-.popup-leave-active { transition: opacity 0.2s ease; }
-.popup-enter-from,
-.popup-leave-to { opacity: 0; }
-.popup-enter-active .popup-card { animation: card-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); }
-
-@keyframes card-pop {
-  from { transform: scale(0.85); opacity: 0; }
-  to   { transform: scale(1);    opacity: 1; }
-}
-
-@keyframes tick-pop {
-  0%   { transform: scale(0); }
-  70%  { transform: scale(1.15); }
-  100% { transform: scale(1); }
-}
-
-/* Players who turn off motion in their device settings get no animation */
-@media (prefers-reduced-motion: reduce) {
-  .popup-tick,
-  .edit-card,
-  .popup-enter-active .popup-card { animation: none; }
+.done-text {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 700;
 }
 </style>

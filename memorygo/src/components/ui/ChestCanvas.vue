@@ -12,13 +12,14 @@ usage:      <ChestCanvas class="set-chest" />   (size it with CSS width / height
 import { onMounted, onBeforeUnmount, ref } from 'vue'
 import { Clock, DirectionalLight, HemisphereLight, PerspectiveCamera, Scene, WebGLRenderer } from 'three'
 import { buildChest } from '@/lib/mapPins3d'
+import { lessMotion } from '@/lib/useSettings'
 
 const host = ref(null)
 let renderer, scene, camera, frameId, resizeObserver
 
 onMounted(() => {
     const el = host.value
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const reduceMotion = lessMotion()   // the Me page's switch, or the device's setting
 
     renderer = new WebGLRenderer({ antialias: true, alpha: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))

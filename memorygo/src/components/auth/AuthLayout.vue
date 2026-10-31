@@ -15,13 +15,14 @@ imports:    SplashScene.vue (the TresJS 3D island)
 import SplashScene from './scene/SplashScene.vue'
 import SkyBackdrop from './SkyBackdrop.vue'
 import appLogo from '@/assets/app-logo.png'      // importing gives Vite's final URL for the image
+import { lessMotion } from '@/lib/useSettings'
 
 defineProps({
     variant: { type: String, default: 'form' },   // 'landing' or 'form'
 })
 
 // Respect the device's "reduce motion" setting: the island stops wiggling
-const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+const reducedMotion = lessMotion()   // the Me page's switch, or the device's setting
 </script>
 
 <template>

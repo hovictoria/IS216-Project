@@ -25,11 +25,12 @@ import { useAuthStore } from '@/stores/auth'
 import { api } from '@/lib/api'
 import { greeting as timeGreeting } from '@/lib/useMood'
 import mapBackground from '@/assets/spirits-map-bg.webp'
+import { lessMotion } from '@/lib/useSettings'
 
 const router = useRouter()
 const journey = useJourneyStore()
 const auth = useAuthStore()
-const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+const reducedMotion = lessMotion()   // the Me page's switch, or the device's setting
 
 const data = ref(null)          // GET /api/journey
 const loading = ref(true)
