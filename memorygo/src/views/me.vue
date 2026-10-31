@@ -3,9 +3,9 @@ PSEUDOCODE
 filename:   views/me.vue
 purpose:    - the Me tab (/me), from the Me handoff (ME_SPEC.md), trimmed to what the app has:
                 profile (Spirit picture or initial, name, joined date, level + XP bar, coins · Spirits · places),
-                Spirits companion → Spirits tab, My kakis (coming next), Easier to use (text size, reduce
-                motion, solid backgrounds), Look & feel (mood), Account (Edit profile, Change password,
-                Language), Sign out
+                Spirits companion → Spirits tab, Easier to use (text size, reduce motion, solid
+                backgrounds), Look & feel (mood), Account (Edit profile, Change password, Language), Sign out
+            - no My kakis (friends): dropped to keep the app simple
             - phone: one scrolling list · laptop (1024px+): profile column on the left (400px), settings on
               the right (layout "A")
             - data: GET /api/me/profile through stores/profile.js; settings change straight away and save in
@@ -187,15 +187,6 @@ onMounted(() => profile.load())
                             <path d="M32 4.5 C 35.5 7.5, 38.5 9.5, 42 11 C 38 13, 34.5 16, 32.5 19.5" />
                         </svg>
                     </RouterLink>
-
-                    <!-- My kakis (friends): step 2 -->
-                    <section class="glass-card kakis" aria-labelledby="kakis-title">
-                        <h2 id="kakis-title" class="card-title">My kakis</h2>
-                        <div class="kakis-row">
-                            <span class="add-kaki" aria-hidden="true">+</span>
-                            <p class="card-note">Add friends with a friend code. Coming soon.</p>
-                        </div>
-                    </section>
 
                     <button type="button" class="outline-btn sign-out" @click="onSignOut">Sign out</button>
                 </div>
@@ -401,13 +392,6 @@ onMounted(() => profile.load())
     letter-spacing: -0.04em;
 }
 
-.card-note {
-    margin: 0;
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--muted);
-}
-
 /* =========================================================
    Profile
    ========================================================= */
@@ -565,7 +549,7 @@ onMounted(() => profile.load())
 }
 
 /* =========================================================
-   Spirits companion + kakis
+   Spirits companion
    ========================================================= */
 .companion {
     flex-direction: row;
@@ -610,26 +594,6 @@ onMounted(() => profile.load())
     stroke-width: 3;
     stroke-linecap: round;
     stroke-linejoin: round;
-}
-
-.kakis-row {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-}
-
-.add-kaki {
-    display: flex;
-    flex-shrink: 0;
-    align-items: center;
-    justify-content: center;
-    width: 56px;
-    height: 56px;
-    border: 2px dashed rgba(22, 20, 18, 0.35);
-    border-radius: 50%;
-    font-size: 24px;
-    font-weight: 800;
-    opacity: 0.6;
 }
 
 /* =========================================================
