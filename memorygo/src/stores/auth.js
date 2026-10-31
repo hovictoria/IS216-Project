@@ -135,7 +135,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     // session listener
-    // getSession() checks for a session. With persistSession: false nothing is saved, so on page load this is always null
+    // getSession() checks for a session saved in the browser (persistSession: true in lib/supabase.js)
     async function init() {
         const { data } = await supabase.auth.getSession()
         // if there is no session, return null

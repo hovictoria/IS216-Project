@@ -134,8 +134,9 @@ router.beforeEach((to) => {
     return '/login'
   }
 
-  // Already logged in: skip the landing & login page (goes straight to the map)
-  if ((to.path === '/login' || to.path === '/' || to.path === '/signup') && auth.isLoggedIn) {
+  // Already logged in: skip the login & sign up pages (goes straight to the map).
+  // The landing page ('/') always shows; it swaps its buttons to "Continue exploring" instead
+  if ((to.path === '/login' || to.path === '/signup') && auth.isLoggedIn) {
     return '/map'
   }
 

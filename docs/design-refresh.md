@@ -312,6 +312,11 @@ Spirits (design: `~/Downloads/MemoryGo-spirits-handoff 2`, 24 Spirits in 6 area 
       the whole square so it reads at 16px; the full pin was too thin in a tab. `public/apple-touch-icon.png`
       (180px, on paper colour) keeps the full soft 3D pin for a phone's home screen. Linked in index.html.
       The logo inside the app (`src/assets/app-logo.png`) is unchanged; `public/favicon.ico` is no longer used
+- [x] Landing page every time (2026-10-31): the session is now saved in the browser (`persistSession: true`,
+      from the edit-profile / reset-password PR), so the router used to skip '/' straight to /map. Now '/'
+      always shows; only /login and /signup skip to /map when signed in. `components/auth/landing.vue` swaps
+      its buttons when signed in: "Continue exploring" (→ /map) + "Not you? Sign out" (stays on the landing,
+      which switches back to "Start exploring" / "I already have an account")
 - [ ] Journey tab (built, waiting on `docs/journey.sql` + a real test)
       - decisions (2026-10-30): today's challenge = finish paid games at 2 places today → +50 coins once a day;
         Puzzle of the day = one of our 6 games (same for everyone, turns each day) paying the game's coins + 20

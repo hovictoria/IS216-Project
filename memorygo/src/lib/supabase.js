@@ -17,9 +17,10 @@ if (!url || !key) {
 
 // create a supabase connection object
 // exported so any file can just use import { supabase }
-// persistSession: false -> the login is kept in memory only, not saved to localStorage.
-//   Closing the tab or refreshing the page signs the user out, so every visit starts at login.
-//   To remember users again, delete the options object (Supabase saves to localStorage by default).
+// persistSession: true -> the login is saved in the browser (localStorage), so closing the tab or
+//   refreshing keeps the user signed in until they press Sign out. The landing page still shows
+//   every time the app opens, with "Continue exploring" instead of the sign-up buttons.
+//   Set it to false to sign everyone out whenever the tab closes.
 export const supabase = createClient(url, key, {
     auth: { persistSession: true },
 })

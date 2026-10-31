@@ -2,13 +2,24 @@
 PSEUDOCODE
 filename:   components/auth/landing.vue
 purpose:    landing page -> when user visits ('/'). Title goes in AuthLayout's hero slot, buttons in the sheet
-imports:    AuthLayout.vue, ui/PrimaryButton.vue, ui/HandUnderline.vue
+            - shows every time the app opens, even when still signed in (the session is saved in the browser)
+            - signed out: "Start exploring" (sign up) + "I already have an account" (log in)
+            - signed in:  "Continue exploring" (straight to the map) + "Not you? Sign out" (for shared devices)
+imports:    AuthLayout.vue, ui/PrimaryButton.vue, ui/HandUnderline.vue, stores/auth.js
 ---------------------------------------------------------------------------------------------------------->
 
 <script setup>
 import AuthLayout from './AuthLayout.vue'
 import PrimaryButton from '@/components/ui/PrimaryButton.vue'
 import HandUnderline from '@/components/ui/HandUnderline.vue'
+import { useAuthStore } from '@/stores/auth'
+
+const auth = useAuthStore()
+
+// signing out here keeps them on the landing page, which switches back to the signed-out buttons
+async function onSignOut() {
+    await auth.signOut()
+}
 
 const tagline = 'Play brain games as you travel and collect Spirits along the way'
 
@@ -26,7 +37,11 @@ const steps = ["Search where you're going", 'Play games on the way', 'Collect Sp
         </template>
 
         <!-- in the sheet -->
-        <div class="actions">
+        <div v-if="auth.isLoggedIn" class="actions">
+            <PrimaryButton to="/map" class="start">Continue exploring</PrimaryButton>
+            <button type="button" class="account-link" @click="onSignOut">Not you? Sign out</button>
+        </div>
+        <div v-else class="actions">
             <PrimaryButton to="/signup" class="start">Start exploring</PrimaryButton>
             <router-link to="/login" class="account-link">I already have an account</router-link>
         </div>
@@ -80,6 +95,9 @@ const steps = ["Search where you're going", 'Play games on the way', 'Collect Sp
     align-items: center;
     justify-content: center;
     height: var(--tap-min);
+    padding: 0;
+    border: 0;
+    background: none;             /* "Sign out" is a <button>: look the same as the link */
     color: var(--ink);
     font-size: 17px;
     font-weight: 700;
