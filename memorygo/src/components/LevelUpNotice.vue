@@ -1,8 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { GAME_NAMES } from '@/config/progression'
-import { areas } from '@/data/stations'
 import SpiritFound from '@/components/SpiritFound.vue'
 
 // The game passes in its reward object (from gamereward.js)
@@ -15,16 +13,6 @@ const levelledUp = computed(() =>
     props.reward && props.reward.levelAfter > props.reward.levelBefore
 )
 
-// Get the names of new games when new games are unlocked
-const newGames = computed(() =>
-    (props.reward?.unlocks?.games ?? []).map(id => GAME_NAMES[id] ?? id)
-)
-
-// Turn area IDs into names from stations.js, e.g. 2 → 'Fort Canning'
-const newAreas = computed(() =>
-    (props.reward?.unlocks?.areas ?? []).map(id => areas.find(a => a.id === id)?.name ?? `Area ${id}`)
-)
-
 // Closed by tapping outside the card; opens again on the next reward
 const dismissed = ref(false)
 watch(() => props.reward, () => { dismissed.value = false; spiritClosed.value = false })
@@ -34,7 +22,7 @@ watch(() => props.reward, () => { dismissed.value = false; spiritClosed.value = 
 const spiritClosed = ref(false)
 const spiritToShow = computed(() => (spiritClosed.value ? null : props.reward?.spirit ?? null))
 
-// Continue takes the player back to the map to try what they unlocked
+// Back to map takes the player back to keep exploring
 const router = useRouter()
 function backToMap() {
     dismissed.value = true
@@ -66,18 +54,7 @@ const confetti = Array.from({ length: 28 }, (_, i) => ({
           </div>
 
           <p class="eyebrow mb-1">Level up!</p>
-          <h2 id="level-up-title" class="title mb-3">You reached Level {{ reward.levelAfter }}</h2>
-
-          <ul v-if="newGames.length || newAreas.length" class="unlocks list-unstyled text-start mb-4">
-            <li v-for="name in newGames" :key="`game-${name}`">
-              <i class="fa-solid fa-puzzle-piece icon green"></i>
-              <span><small>New game</small>{{ name }}</span>
-            </li>
-            <li v-for="name in newAreas" :key="`area-${name}`">
-              <i class="fa-solid fa-map-location-dot icon blue"></i>
-              <span><small>New area</small>{{ name }}</span>
-            </li>
-          </ul>
+          <h2 id="level-up-title" class="title mb-4">You reached Level {{ reward.levelAfter }}</h2>
 
           <button class="continue-btn" @click="backToMap">
             Back to map<i class="fa-solid fa-map-location-dot ms-2"></i>
@@ -178,45 +155,6 @@ const confetti = Array.from({ length: 28 }, (_, i) => ({
     font-weight: 700;
     line-height: 1.2;
 }
-
-/* What the new level unlocked */
-.unlocks li {
-    display: flex;
-    align-items: center;
-    gap: 0.85rem;
-    padding: 0.75rem 1rem;
-    border: 1px solid var(--dash);
-    border-radius: 14px;
-    background: #fff;
-    font-size: 1.15rem;
-    font-weight: 700;
-}
-
-.unlocks li + li {
-    margin-top: 0.6rem;
-}
-
-.unlocks small {
-    display: block;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--ink-soft);
-}
-
-.icon {
-    width: 44px;
-    height: 44px;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 12px;
-    color: #fff;
-    font-size: 1.2rem;
-}
-
-.icon.green { background: var(--green); }
-.icon.blue { background: var(--blue); }
 
 /* Terracotta button, same as the dashboard's main button */
 .continue-btn {

@@ -1,20 +1,15 @@
-// Define levels and calculate game/area unlocks.
-
-// Define all levels and their unlock requirements.
 export const LEVELS = [
-  { level: 1, xp: 0,   games: ['memory', 'object-id'], areas: [1] },
-  { level: 2, xp: 100, games: ['odd-one-out'],         areas: [] },
-  { level: 3, xp: 250, games: ['pattern'],             areas: [] },
-  { level: 4, xp: 450, games: ['whats-missing'],       areas: [2] },
-  { level: 5, xp: 700, games: ['sequence'],            areas: [] }
+  { level: 1,  xp: 0 },
+  { level: 2,  xp: 100 },
+  { level: 3,  xp: 250 },
+  { level: 4,  xp: 450 },
+  { level: 5,  xp: 700 },
+  { level: 6,  xp: 1000 },
+  { level: 7,  xp: 1350 },
+  { level: 8,  xp: 1750 },
+  { level: 9,  xp: 2200 },
+  { level: 10, xp: 2700 }
 ];
-
-// Names for unlock messages
-export const GAME_NAMES = {
-  'memory': 'Memory Match', 'object-id': 'Object Identification',
-  'odd-one-out': 'Odd One Out', 'pattern': 'Pattern', 
-  'whats-missing': "What's Missing", 'sequence': 'Sequence Recall'
-};
 
 // Store the maximum level.
 export const MAX_LEVEL = LEVELS.length;
@@ -94,78 +89,3 @@ export function progressToNext(xp) {
     percent
   };
 }
-
-// Get every game and area unlocked up to a level.
-export function unlockedUpTo(level) {
-  const unlockedGames = [];
-  const unlockedAreas = [];
-
-  // Visit each level that the user has reached.
-  for (const item of LEVELS) {
-    if (item.level <= level) {
-      unlockedGames.push(...item.games);
-      unlockedAreas.push(...item.areas);
-    }
-  }
-
-  // Return both lists.
-  return {
-    games: [...new Set(unlockedGames)],
-    areas: [...new Set(unlockedAreas)]
-  };
-}
-
-// Check whether a particular game is unlocked.
-export function isGameUnlocked(gameId, xp) {
-  const level = levelFromXp(xp);
-  const unlocked = unlockedUpTo(level);
-
-  // True if the game exists in the unlocked list.
-  return unlocked.games.includes(gameId);
-}
-
-// Check whether a particular area is unlocked.
-export function isAreaUnlocked(areaId, xp) {
-  const level = levelFromXp(xp);
-  const unlocked = unlockedUpTo(level);
-
-  // True if the area exists in the unlocked list.
-  return unlocked.areas.includes(areaId);
-}
-
-// Find the level needed to unlock a game.
-export function gameUnlockLevel(gameId) {
-  const item = LEVELS.find(
-    level => level.games.includes(gameId)
-  );
-
-  return item ? item.level : null;
-}
-
-// Find the level needed to unlock an area.
-export function areaUnlockLevel(areaId) {
-  const item = LEVELS.find(
-    level => level.areas.includes(areaId)
-  );
-
-  return item ? item.level : null;
-}
-
-// Find newly unlocked games and areas after XP changes.
-export function newUnlocks(oldXp, newXp) {
-  const oldLevel = levelFromXp(oldXp);
-  const newLevel = levelFromXp(newXp);
-
-  const before = unlockedUpTo(oldLevel);
-  const after = unlockedUpTo(newLevel);
-
-  return {
-    games: after.games.filter(
-      game => !before.games.includes(game)
-    ),
-    areas: after.areas.filter(
-      area => !before.areas.includes(area)
-    )
-  };
-}
-
