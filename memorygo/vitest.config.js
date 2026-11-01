@@ -2,13 +2,16 @@ import { fileURLToPath } from 'node:url'
 import { mergeConfig, defineConfig, configDefaults } from 'vitest/config'
 import viteConfig from './vite.config.js'
 
-export default mergeConfig(
-  viteConfig,
-  defineConfig({
-    test: {
-      environment: 'jsdom',
-      exclude: [...configDefaults.exclude, 'e2e/**'],
-      root: fileURLToPath(new URL('./', import.meta.url)),
-    },
-  }),
+// vite.config.js is a function (it checks the mode for phone testing), so call it first, then add the test settings
+export default defineConfig((env) =>
+  mergeConfig(
+    viteConfig(env),
+    defineConfig({
+      test: {
+        environment: 'jsdom',
+        exclude: [...configDefaults.exclude, 'e2e/**'],
+        root: fileURLToPath(new URL('./', import.meta.url)),
+      },
+    }),
+  ),
 )

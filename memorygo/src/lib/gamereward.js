@@ -15,7 +15,7 @@
 
 import { ref } from 'vue'
 import { api } from './api'
-import { levelFromXp, newUnlocks } from '@/config/progression'
+import { levelFromXp } from '@/config/progression'
 import { forgetSpirits } from './spiritsCache'
 
 // the games call useGameReward with their scoring name; the Puzzle of the day uses the page names
@@ -59,8 +59,7 @@ export function useGameReward(game) {
             reward.value = {
                 ...data,
                 levelBefore: levelFromXp(before),
-                levelAfter: levelFromXp(data.xp),
-                unlocks: newUnlocks(before, data.xp)
+                levelAfter: levelFromXp(data.xp)
             }
         } catch (error) {
             awarded = false

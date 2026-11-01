@@ -130,8 +130,10 @@ router.put('/settings', requireAuth, async (req, res) => {
     }
 })
 
-// Every table that keeps rows for one player (user_id column)
-const USER_TABLES = ['visits', 'daily_rewards', 'spirit_finds', 'spirit_sets_done', 'progress']
+// Every table that keeps rows for one player (user_id column), deleted in this order.
+// A row that points to another table must go first: spirit_finds points to visits (visit_id),
+// so spirit_finds is deleted before visits, or the database refuses
+const USER_TABLES = ['profiles', 'user_settings', 'spirit_finds', 'spirit_sets_done', 'daily_rewards', 'visits', 'progress']
 
 // DELETE /api/me → delete the signed-in player's account and everything saved for them
 // The app checks their password before calling this (stores/auth.js deleteAccount)
