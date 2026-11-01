@@ -401,9 +401,15 @@ function centreOnMe() {
 //   'insecure' the page isn't https or localhost, so the browser never gives a location
 //              (e.g. testing on an iPad through http://192.168.x.x)
 //   'outside'  the location is outside Singapore
-// Step 6: tapping in will only be allowed when this is 'ok'
+// Step 6: tapping in will only be allowed when this is 'ok' AND the precise location has arrived
+//
+// Two asks, so the map doesn't sit on "Finding your location…":
+//   quick  a rough guess from Wi-Fi / phone towers (about 1 s), or one from the last 30 s if the phone
+//          has it (coming back to the Map tab). Moves the map and the dot, but can't tap you in
+//   exact  GPS, keeps following you. Takes over as soon as it answers; the quick one is then ignored
 const locationStatus = ref('waiting')
 let hasFix = false                           // true once a real location inside Singapore has arrived
+const precise = ref(false)                   // true once the exact (GPS) location has arrived
 let linkedPlace = false                      // true when opened with ?place= (don't jump away to the user)
 const route = useRoute()
 
@@ -414,6 +420,18 @@ const LOCATION_NOTES = {
     off: 'Location is off · showing SMU area',
     insecure: 'Location needs https · showing SMU area',
     outside: 'Outside Singapore · showing city centre',
+}
+
+// the quick guess: only used while the exact one hasn't answered yet
+function onQuickLocation(position) {
+    // (map is null if they already left the Map tab: it can't be cancelled like the watch)
+    if (map && !precise.value) onLocation(position)
+}
+
+// the exact one (watchPosition)
+function onExactLocation(position) {
+    precise.value = true
+    onLocation(position)
 }
 
 function onLocation(position) {
@@ -458,7 +476,8 @@ const tapInState = ref('idle')               // 'idle' | 'starting'
 const tapInMessage = ref('')                 // the server's reason if it said no
 
 const tapInPlace = computed(() => {
-    if (locationStatus.value !== 'ok') return null
+    // a rough guess can be a block off, so no Tap in until the exact location arrives
+    if (locationStatus.value !== 'ok' || !precise.value) return null
     return places.value
         .map((place) => ({ place, distance: distanceM(userPos.value, [place.lng, place.lat]) }))
         .filter(({ place, distance }) => distance <= place.radiusM)
@@ -713,7 +732,13 @@ onMounted(() => {
     if (!window.isSecureContext || !navigator.geolocation) {
         locationStatus.value = 'insecure'
     } else {
-        watchId = navigator.geolocation.watchPosition(onLocation, onLocationError, {
+        // quick: errors are ignored here, the exact one below reports them
+        navigator.geolocation.getCurrentPosition(onQuickLocation, () => {}, {
+            enableHighAccuracy: false,
+            maximumAge: 30000,
+            timeout: 10000,
+        })
+        watchId = navigator.geolocation.watchPosition(onExactLocation, onLocationError, {
             enableHighAccuracy: true,
             timeout: 15000,
         })

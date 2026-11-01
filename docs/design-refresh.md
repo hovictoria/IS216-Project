@@ -317,13 +317,27 @@ Spirits (design: `~/Downloads/MemoryGo-spirits-handoff 2`, 24 Spirits in 6 area 
       always shows; only /login and /signup skip to /map when signed in. `components/auth/landing.vue` swaps
       its buttons when signed in: "Continue exploring" (→ /map) + "Not you? Sign out" (stays on the landing,
       which switches back to "Start exploring" / "I already have an account")
+- [ ] Faster location on the map (2026-11-01, waiting on a real phone test): `views/map.vue` now asks twice.
+      A quick rough guess (Wi-Fi / phone towers, or one from the last 30 s, so coming back to the Map tab is
+      instant) moves the map and dot; the exact GPS watch takes over when it answers. Tap in stays off until
+      the exact location arrives (a rough guess can be a block off). Nothing about the location is saved
+- [ ] Vercel deploy (started 2026-11-01): two Vercel projects from the same repo, `memorygo-api` (Root
+      Directory `server`) and `memorygo` (Root Directory `memorygo`). `server.js` now exports the app and only
+      calls app.listen when not on Vercel (Vercel sets VERCEL=1). `memorygo/vercel.json` sends every address
+      to index.html so refreshing /map works. The service role key only ever goes in the API project.
+      Next: production link working → `staging` branch with its own addresses → GitHub Actions checks
+- [ ] Home-screen app (2026-11-01, waiting on a phone test): the smallest kind of PWA. `public/manifest.webmanifest`
+      (name, paper colours, full screen) + 3 lines in index.html + `public/pwa-192.png` / `pwa-512.png` (the tab
+      badge at 80% on paper, so Android's round crop fits). No service worker on purpose: nothing is saved on the
+      phone, so there's never an "old version" problem; it needs internet like the website
 - [ ] Me tab, step 1 (built 2026-10-31, waiting on `docs/me.sql` + a real test). From `MemoryGo-me-handoff`,
       trimmed with the user: no photo upload (pick one of your Spirits instead), no daily reminder, no arrival
-      buzz, no weather, no Family & safety, Language = English placeholder, no help line. Laptop = layout "A"
+      buzz, no weather, no Family & safety, no My kakis (friends: too much for this app, dropped 2026-10-31),
+      Language = English placeholder, no help line. Laptop = layout "A"
       (profile column 400px left, settings right, Sign out pinned to the bottom so both columns end level)
       - `views/me.vue` (/me): Spirit picture or initial (+ newest Spirit peeking), name with underline,
         "Explorer since", Level chip + XP bar (config/progression.js), coins · Spirits x/24 · places,
-        Spirits companion → /spirits, My kakis (placeholder until step 2), settings, Account rows, Sign out.
+        Spirits companion → /spirits, settings, Account rows, Sign out.
         Replaces `views/profile.vue` (no longer routed; teammate's file, not deleted)
       - settings: `lib/useSettings.js` + `styles/settings.css`. Text size = CSS zoom 1 / 1.12 / 1.25 on every
         page except the map itself (16px stays the smallest, so no "small"); reduce motion = class + lessMotion()
