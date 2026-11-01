@@ -326,6 +326,10 @@ Spirits (design: `~/Downloads/MemoryGo-spirits-handoff 2`, 24 Spirits in 6 area 
       calls app.listen when not on Vercel (Vercel sets VERCEL=1). `memorygo/vercel.json` sends every address
       to index.html so refreshing /map works. The service role key only ever goes in the API project.
       Next: production link working → `staging` branch with its own addresses → GitHub Actions checks
+- [ ] Home-screen app (2026-11-01, waiting on a phone test): the smallest kind of PWA. `public/manifest.webmanifest`
+      (name, paper colours, full screen) + 3 lines in index.html + `public/pwa-192.png` / `pwa-512.png` (the tab
+      badge at 80% on paper, so Android's round crop fits). No service worker on purpose: nothing is saved on the
+      phone, so there's never an "old version" problem; it needs internet like the website
 - [ ] Me tab, step 1 (built 2026-10-31, waiting on `docs/me.sql` + a real test). From `MemoryGo-me-handoff`,
       trimmed with the user: no photo upload (pick one of your Spirits instead), no daily reminder, no arrival
       buzz, no weather, no Family & safety, no My kakis (friends: too much for this app, dropped 2026-10-31),
