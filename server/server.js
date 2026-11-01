@@ -69,6 +69,11 @@ app.use((err, req, res, next) => {
     res.status(500).json({ message: 'Something went wrong.' })
 })
 
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Memory Go API running at port ${PORT}`)
-})
+// On Vercel, Vercel starts the app itself (it sets VERCEL=1), so we only listen on our own computers
+if (!process.env.VERCEL) {
+    app.listen(PORT, '0.0.0.0', () => {
+        console.log(`Memory Go API running at port ${PORT}`)
+    })
+}
+
+export default app

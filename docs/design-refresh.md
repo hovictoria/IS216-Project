@@ -321,6 +321,11 @@ Spirits (design: `~/Downloads/MemoryGo-spirits-handoff 2`, 24 Spirits in 6 area 
       A quick rough guess (Wi-Fi / phone towers, or one from the last 30 s, so coming back to the Map tab is
       instant) moves the map and dot; the exact GPS watch takes over when it answers. Tap in stays off until
       the exact location arrives (a rough guess can be a block off). Nothing about the location is saved
+- [ ] Vercel deploy (started 2026-11-01): two Vercel projects from the same repo, `memorygo-api` (Root
+      Directory `server`) and `memorygo` (Root Directory `memorygo`). `server.js` now exports the app and only
+      calls app.listen when not on Vercel (Vercel sets VERCEL=1). `memorygo/vercel.json` sends every address
+      to index.html so refreshing /map works. The service role key only ever goes in the API project.
+      Next: production link working → `staging` branch with its own addresses → GitHub Actions checks
 - [ ] Me tab, step 1 (built 2026-10-31, waiting on `docs/me.sql` + a real test). From `MemoryGo-me-handoff`,
       trimmed with the user: no photo upload (pick one of your Spirits instead), no daily reminder, no arrival
       buzz, no weather, no Family & safety, no My kakis (friends: too much for this app, dropped 2026-10-31),
