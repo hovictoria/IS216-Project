@@ -53,15 +53,16 @@ html.solid *::before {
     backdrop-filter: none !important;
 }
 
-/* white glass → paper */
+/* white glass → paper. Kept to these exact components: the Near you / place cards also use the
+   class names "card" and "bottom", and must keep their MRT line and spot colours */
 html.solid .glass-card,
 html.solid .app-nav .tabs,
 html.solid .coin-pill,
 html.solid .map-page .search,
-html.solid .map-page .field,
+html.solid .map-page .place-search .field,
 html.solid .map-page .sheet,
-html.solid .map-page .card,
-html.solid .map-page .bottom,
+html.solid .map-page .hud .card:not(.card-dark),
+html.solid .map-page .hud .bottom,
 html.solid .map-page .zoom-note,
 html.solid .map-page .round-btn,
 html.solid .journey-page .box:not(.challenge):not(.trip),
