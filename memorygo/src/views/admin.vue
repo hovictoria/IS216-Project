@@ -14,15 +14,18 @@ note:       the real check that someone is an admin MUST happen on the server (s
 import { ref, reactive, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
-// import AppNav from '@/components/ui/AppNav.vue'   // add <AppNav /> at the top of the template if you want the tab bar here
+import { useRouter } from 'vue-router'
+const router = useRouter()
 
-// true  = fake users on this page only (no server needed, handy for design work)
-// false = the real server: GET / PATCH / DELETE  /api/admin/users
-const USE_MOCK = false
+function goBack() {
+  if (window.history.state?.back) router.back()
+  else router.push(props.exitTo)
+}
+
 
 /* ---------- Mock data ---------- */
 const auth = useAuthStore()
-const CURRENT_ADMIN_ID = USE_MOCK ? 1 : auth.user?.id   // the person using this page (can't delete or demote themselves)
+const CURRENT_ADMIN_ID = auth.user?.id   // the person using this page (can't delete or demote themselves)
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -32,38 +35,20 @@ function daysAgo(n) {
     return d.toLocaleDateString('en-CA') // YYYY-MM-DD
 }
 
-const mockUsers = () => [
-    { id: 1, name: 'Victoria Ho', email: 'victoria@memorygo.app', role: 'admin', xp: 640, coins: 310, streak: 12, lastPlayed: daysAgo(0), joined: '2026-06-02' },
-    { id: 2, name: 'Mary Tan', email: 'mary.tan@example.com', role: 'player', xp: 420, coins: 205, streak: 5, lastPlayed: daysAgo(0), joined: '2026-07-14' },
-    { id: 3, name: 'Lim Ah Kow', email: 'ahkow.lim@example.com', role: 'player', xp: 310, coins: 150, streak: 0, lastPlayed: daysAgo(4), joined: '2026-07-20' },
-    { id: 4, name: 'Siti Rahman', email: 'siti.r@example.com', role: 'player', xp: 880, coins: 455, streak: 21, lastPlayed: daysAgo(1), joined: '2026-06-18' },
-    { id: 5, name: 'Raj Kumar', email: 'raj.kumar@example.com', role: 'player', xp: 150, coins: 80, streak: 2, lastPlayed: daysAgo(1), joined: '2026-09-03' },
-    { id: 6, name: 'Chen Mei Ling', email: 'meiling.chen@example.com', role: 'player', xp: 95, coins: 40, streak: 0, lastPlayed: daysAgo(12), joined: '2026-09-21' },
-    { id: 7, name: 'David Ong', email: 'david.ong@example.com', role: 'admin', xp: 20, coins: 10, streak: 1, lastPlayed: daysAgo(0), joined: '2026-10-01' },
-    { id: 8, name: 'Aisha Binte Yusof', email: 'aisha.y@example.com', role: 'player', xp: 560, coins: 270, streak: 8, lastPlayed: daysAgo(0), joined: '2026-07-30' },
-    { id: 9, name: 'Tan Boon Huat', email: 'boonhuat.tan@example.com', role: 'player', xp: 0, coins: 0, streak: 0, lastPlayed: null, joined: '2026-10-25' },
-    { id: 10, name: 'Grace Lee', email: 'grace.lee@example.com', role: 'player', xp: 335, coins: 165, streak: 3, lastPlayed: daysAgo(2), joined: '2026-08-11' },
-]
 
 /* >> API << load every user */
 async function loadUsers() {
-    if (USE_MOCK) {
-        await delay(500)
-        return mockUsers()
-    }
     const { data } = await api.get('/admin/users')
     return data
 }
 
 /* >> API << save changes to one user */
 async function saveUser(id, changes) {
-    if (USE_MOCK) return delay(500)
     await api.patch(`/admin/users/${id}`, changes)
 }
 
 /* >> API << delete one user */
 async function removeUser(id) {
-    if (USE_MOCK) return delay(500)
     await api.delete(`/admin/users/${id}`)
 }
 
@@ -254,6 +239,9 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="admin-page">
+    <button type="button" class="btn btn-pill rounded-pill px-3 px-md-4" @click="goBack">
+        <i class="fa-solid fa-arrow-left me-2"></i>Back
+    </button>
     <main class="admin-main">
 
       <!-- Heading -->
@@ -931,9 +919,29 @@ onBeforeUnmount(() => {
     flex: 1;
 }
 
+.btn-pill {
+  --bs-btn-color: var(--ink);
+  --bs-btn-bg: var(--glass-bg);
+  --bs-btn-border-color: var(--glass-border);
+  --bs-btn-hover-color: var(--ink);
+  --bs-btn-hover-bg: #fff;
+  --bs-btn-hover-border-color: #fff;
+  --bs-btn-active-color: var(--ink);
+  --bs-btn-active-bg: #fff;
+  --bs-btn-active-border-color: #fff;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  font-weight: 700;
+  -webkit-backdrop-filter: blur(20px) saturate(170%);
+  backdrop-filter: blur(20px) saturate(170%);
+  box-shadow: var(--glass-shadow);
+  margin:20px;
+}
+
 @media (min-width: 768px) {
     .admin-main {
-        padding: 5.5rem 2rem 4rem;   /* room for the nav pill at the top-right */
+        padding: 1rem 2rem 4rem;   /* room for the nav pill at the top-right */
     }
 
     .table-wrap {

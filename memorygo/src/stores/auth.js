@@ -24,6 +24,17 @@ export const useAuthStore = defineStore('auth', () => {
     const user = ref(null)
     const isLoggedIn = computed(() => user.value != null)
 
+    const isAdmin = ref(false)
+
+    // 200 from /api/admin/me means this person is an admin, 403 means not
+    async function checkAdmin() {
+        try {
+            await api.get('/admin/me')
+            isAdmin.value = true
+        } catch {
+            isAdmin.value = false
+        }
+    }
     // Helps the user SignIn. useAuthStore method used in file "xx"
     async function signIn(email, password) {
         // Use supabase method (.auth.signInWithPassword)
@@ -32,6 +43,7 @@ export const useAuthStore = defineStore('auth', () => {
             // on Success. It contains a session: an access token, refresh token, expiry, and user object
             // Session is kept in memory only (persistSession: false in lib/supabase.js), so a refresh signs you out
             // Starts a timer to swap the access token for a new one before it expires
+            await checkAdmin()
             return null
         }
         if (error.message === 'Email not confirmed') {
@@ -132,6 +144,7 @@ export const useAuthStore = defineStore('auth', () => {
     async function signOut() {
         await supabase.auth.signOut()
         user.value = null
+        isAdmin.value = false
     }
 
     // session listener
@@ -144,10 +157,11 @@ export const useAuthStore = defineStore('auth', () => {
         supabase.auth.onAuthStateChange((_event, session) => {
             user.value = session?.user ?? null
         })
+        if (user.value) await checkAdmin()
     }
 
     return {
         user, isLoggedIn, init, signIn, signUp, signOut,
-        sendPasswordReset, updatePassword, updateName, changePassword, deleteAccount
+        sendPasswordReset, updatePassword, updateName, changePassword, deleteAccount,isAdmin
     }
 })

@@ -277,6 +277,18 @@ onMounted(() => profile.load())
                             </span>
                             <span class="row-value">English</span>
                         </div>
+                        <!-- Admins only: manage users -->
+                        <RouterLink v-if="auth.isAdmin" to="/admin" class="account-row admin-row">
+                            <span class="setting-text">
+                                <span class="setting-name">Manage users</span>
+                                <span class="setting-note">Only admins can see this</span>
+                            </span>
+                            <span class="admin-chip">Admin</span>
+                            <svg class="arrow" viewBox="0 0 46 24" aria-hidden="true">
+                                <path d="M3 13.5 C 13 11, 26 13.5, 41 11" />
+                                <path d="M32 4.5 C 35.5 7.5, 38.5 9.5, 42 11 C 38 13, 34.5 16, 32.5 19.5" />
+                            </svg>
+                        </RouterLink>
                     </section>
                 </div>
             </div>
@@ -762,6 +774,23 @@ button.account-row .setting-name {
     font-size: 17px;
     font-weight: 700;
     color: var(--muted);
+}
+/* the admin-only row (a link, so no underline) */
+.admin-row {
+    text-decoration: none;
+}
+
+.admin-row:hover {
+    color: var(--ink);
+}
+
+.admin-chip {
+    padding: 4px 12px;
+    border-radius: var(--radius-pill);
+    background: var(--ink);
+    color: var(--white);
+    font-size: 14px;
+    font-weight: 800;
 }
 
 /* =========================================================
