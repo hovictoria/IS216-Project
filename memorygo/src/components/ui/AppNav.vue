@@ -5,6 +5,7 @@ purpose:    - the main navigation: Map, Spirits, Journey, Me
             - phone (< 768px):  floating glass pill at the bottom, icon + label per tab
             - iPad / laptop:    glass pill at the top-right with text tabs, the coin pill and an avatar
             - router-link adds the class "router-link-active" to the current tab; we style that black
+            - tab labels come from lib/useLanguage.js, so our own wording is used where Google gets it wrong
 props:      coins (shown in the top bar on big screens)
 note:       Journey points to the Journey tab (views/journey.vue); the old /menu dashboard was removed
 ---------------------------------------------------------------------------------------------------------->
@@ -15,6 +16,7 @@ import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/profile'
 import { pictureOf } from '@/lib/spiritPictures'
+import { word, hasWord } from '@/lib/useLanguage'
 import CoinPill from './CoinPill.vue'
 
 defineProps({
@@ -68,7 +70,8 @@ const tabs = [
                     stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
                     <path :d="tab.icon" />
                 </svg>
-                <span>{{ tab.label }}</span>
+                <!-- our own wording when we have it (translate="no" stops Google changing it) -->
+                <span :translate="hasWord(tab.label) ? 'no' : null">{{ word(tab.label) }}</span>
             </router-link>
         </div>
 
@@ -119,6 +122,7 @@ const tabs = [
     font-size: 14px;
     font-weight: 700;
     text-decoration: none;
+    white-space: nowrap;                /* keeps Chinese (and other) labels on one line */
 }
 
 .tab:hover {
@@ -146,6 +150,13 @@ const tabs = [
     width: 78%;
     height: 78%;
     object-fit: contain;
+}
+
+/* narrow phones: a touch smaller so longer labels still fit */
+@media (max-width: 400px) {
+    .tab {
+        font-size: 13px;
+    }
 }
 
 /* =========================================================

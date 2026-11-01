@@ -29,6 +29,7 @@ import { useProfileStore } from '@/stores/profile'
 import { settings, changeSetting, lessMotion } from '@/lib/useSettings'
 import { pictureOf } from '@/lib/spiritPictures'
 import { progressToNext } from '@/config/progression'
+import { LANGUAGES, language, word, hasWord } from '@/lib/useLanguage'
 import mapBackground from '@/assets/spirits-map-bg.webp'
 
 const auth = useAuthStore()
@@ -103,18 +104,7 @@ async function onSignOut() {
 /* =========================================================
    Language (our pop-up drives a hidden Google Translate)
    ========================================================= */
-const LANGUAGES = [
-    { code: 'en',    name: 'English',       label: 'English' },
-    { code: 'zh-CN', name: '中文',           label: 'Chinese' },
-    { code: 'ms',    name: 'Bahasa Melayu', label: 'Malay' },
-    { code: 'ta',    name: 'தமிழ்',          label: 'Tamil' },
-]
-
-function savedLanguage() {
-    try { return localStorage.getItem('mg-language') || 'en' } catch { return 'en' }
-}
-
-const language = ref(savedLanguage())            // the language in use
+// (LANGUAGES, language, word and hasWord come from lib/useLanguage.js)
 const pendingLanguage = ref(language.value)      // the radio they picked, before Save
 const showLanguage = ref(false)
 const languageName = computed(() => LANGUAGES.find((l) => l.code === language.value)?.name ?? 'English')
@@ -240,7 +230,7 @@ onMounted(() => {
                                 <dd>{{ me.coins.toLocaleString() }}</dd>
                             </div>
                             <div class="stat">
-                                <dt>Spirits</dt>
+                                <dt :translate="hasWord('Spirits') ? 'no' : null">{{ word('Spirits') }}</dt>
                                 <dd>{{ me.spiritsFound }}/{{ me.spiritsTotal }}</dd>
                             </div>
                             <div class="stat">
@@ -257,7 +247,10 @@ onMounted(() => {
                         <span class="companion-pics" aria-hidden="true">
                             <img v-for="s in me.newestSpirits" :key="s.id" :src="pictureOf(s.id)" alt="" />
                         </span>
-                        <span class="companion-text">Your Spirits companion: {{ companion.name }}</span>
+                        <span class="companion-text">
+                            Your <span :translate="hasWord('Spirits') ? 'no' : null">{{ word('Spirits') }}</span> companion:
+                            <span translate="no">{{ companion.name }}</span>
+                        </span>
                         <svg class="arrow" viewBox="0 0 46 24" aria-hidden="true">
                             <path d="M3 13.5 C 13 11, 26 13.5, 41 11" />
                             <path d="M32 4.5 C 35.5 7.5, 38.5 9.5, 42 11 C 38 13, 34.5 16, 32.5 19.5" />
@@ -320,7 +313,9 @@ onMounted(() => {
                             <div class="segmented" role="radiogroup" aria-labelledby="mood-label">
                                 <button v-for="m in MOODS" :key="m.value" type="button" role="radio"
                                     :aria-checked="settings.mood === m.value" :class="{ on: settings.mood === m.value }"
-                                    @click="setSetting('mood', m.value)">{{ m.label }}</button>
+                                    @click="setSetting('mood', m.value)">
+                                    <span :translate="hasWord(m.label) ? 'no' : null">{{ word(m.label) }}</span>
+                                </button>
                             </div>
                         </div>
                     </section>
@@ -603,6 +598,7 @@ onMounted(() => {
 
 .level-chip {
     padding: 4px 14px;
+    white-space: nowrap;
     border-radius: var(--radius-pill);
     background: var(--ink);
     color: var(--white);
@@ -818,6 +814,7 @@ onMounted(() => {
 
 .segmented button {
     min-height: 48px;
+    white-space: nowrap;
     border: 0;
     border-radius: var(--radius-pill);
     background: transparent;
@@ -1133,16 +1130,23 @@ button.account-row .setting-name {
 </style>
 
 <!-- NOT scoped: Google injects its own elements, which scoped styles can't reach.
-     Hides Google's top banner and stops it pushing the page down. -->
+     Hides Google's "Translated into…" bar (it covers the nav) and stops it pushing the page down. -->
 <style>
+body > .skiptranslate,
+iframe.skiptranslate,
 .goog-te-banner-frame,
+.VIpgJd-ZVi9od-ORHb-OEVmcd,
+.VIpgJd-ZVi9od-aZ2wEe-wOHMyf,
 #goog-gt-tt,
 .goog-te-balloon-frame {
     display: none !important;
+    visibility: hidden !important;
 }
 
+html,
 body {
     top: 0 !important;
+    margin-top: 0 !important;
 }
 
 .goog-text-highlight {
