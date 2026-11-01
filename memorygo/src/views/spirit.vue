@@ -21,6 +21,7 @@ import AppNav from '@/components/ui/AppNav.vue'
 import { GAME_LABELS } from '@/data/placeLabels'
 import { api } from '@/lib/api'
 import { savedSpirits } from '@/lib/spiritsCache'
+import { EMOTE_FOR, EMOTE_LENGTH, EMOTE_SECONDS, EMOTE_BEATS, SHOUT_FOR } from '@/three/spiritEmotes'
 // the spirit drawings, for the set row (same as the Spirits tab)
 const pictures = import.meta.glob('@/assets/spirits/*.svg', { eager: true, import: 'default' })
 const pictureOf = (id) => pictures[`/src/assets/spirits/${id}.svg`]
@@ -35,6 +36,31 @@ const loading = ref(true)
 const errorMsg = ref('')
 const coins = ref(null)
 const canShare = typeof navigator !== 'undefined' && !!navigator.share
+
+// the 3D Spirit, so tapping it can make it perform. The emote runs inside three.js on the model's
+// own parts (see three/spiritEmotes.js) — CSS could only slide the whole canvas about as one picture
+const canvas = ref(null)
+
+// what the Spirit is shouting right now, e.g. '67', drawn over the canvas while it performs
+const shout = ref('')
+// one bob of a digit, matched to one swap of the hands so the digits keep time with them
+const shoutBeat = ref('0.64s')
+let shoutTimer = null
+
+function tapSpirit() {
+    if (!canvas.value?.playEmote()) return      // already performing, or motion is turned off
+    const emote = EMOTE_FOR[spirit.value?.id]
+    const text = SHOUT_FOR[emote]
+    if (!text) return
+    const seconds = EMOTE_LENGTH[emote] ?? EMOTE_SECONDS
+    const beats = EMOTE_BEATS[emote]
+    if (beats) shoutBeat.value = `${(seconds / beats).toFixed(2)}s`
+    shout.value = text
+    clearTimeout(shoutTimer)
+    shoutTimer = setTimeout(() => { shout.value = '' }, seconds * 1000)
+}
+
+onBeforeUnmount(() => clearTimeout(shoutTimer))
 
 // the nav only shows on laptop (top-right, beside the details); on phone / iPad the bottom bar
 // would cover "Show on map" and the top pill would cover the rarity chip
@@ -132,9 +158,16 @@ async function share() {
 
                 <PaperMap />
 
-                <div class="model">
-                    <SpiritCanvas v-if="foundRow" :key="spirit.id" :spirit-id="spirit.id" :color="spirit.color" :label="spirit.name" />
+                <div class="model" :class="{ tappable: foundRow }" @click="tapSpirit">
+                    <SpiritCanvas v-if="foundRow" ref="canvas" :key="spirit.id" :spirit-id="spirit.id" :color="spirit.color" :label="spirit.name" />
                     <img v-else :src="lockedPicture" alt="" class="locked-picture" />
+
+                    <!-- what the Spirit shouts while it performs. Decoration, so it is hidden from
+                         screen readers: the Spirit's name and story are already in the text below -->
+                    <p v-if="shout" class="shout" aria-hidden="true" :style="{ '--beat': shoutBeat }">
+                        <span v-for="(ch, i) in shout.split('')" :key="i"
+                              class="shout-digit" :class="i % 2 ? 'shout-down' : 'shout-up'">{{ ch }}</span>
+                    </p>
                 </div>
             </section>
 
@@ -300,6 +333,59 @@ async function share() {
     position: relative;
     width: 280px;
     height: 280px;
+}
+
+/* only a Spirit you have actually found can be tapped to perform */
+.model.tappable {
+    cursor: pointer;
+}
+
+/* the "67" a Spirit throws up while it performs */
+.shout {
+    position: absolute;
+    top: 4%;
+    right: 2%;
+    z-index: 2;
+    display: flex;
+    gap: 0;
+    margin: 0;
+    pointer-events: none;                /* must never swallow the tap that starts the emote */
+    /* the size follows the Spirit at each breakpoint below, so it does not shrink on a big screen */
+    font: 900 84px/1 var(--font);
+    letter-spacing: -0.06em;
+    animation: shout-in 0.3s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+.shout-digit {
+    display: inline-block;
+    color: var(--butter, #F3D57C);
+    -webkit-text-stroke: 4px var(--ink);
+    paint-order: stroke fill;            /* outline sits outside the digit, not over it */
+    text-shadow: 0 4px 0 rgba(22, 20, 18, 0.25);
+    /* --beat is one swap of the hands, set from the emote's own rate, so the digits keep time */
+    animation: shout-bob var(--beat, 0.64s) ease-in-out infinite;
+}
+
+/* one digit rises as the other drops, the same way the hands trade places */
+.shout-down {
+    animation-delay: calc(var(--beat, 0.64s) / -2);
+}
+
+@keyframes shout-bob {
+    0%, 100% { transform: translateY(-9px) rotate(-6deg); }
+    50%      { transform: translateY(9px) rotate(6deg); }
+}
+
+@keyframes shout-in {
+    from { transform: scale(0.4) rotate(-10deg); opacity: 0; }
+    to   { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .shout,
+    .shout-digit {
+        animation: none;
+    }
 }
 
 .locked-picture {
@@ -545,6 +631,10 @@ async function share() {
         height: 360px;
     }
 
+    .shout {
+        font-size: 104px;
+    }
+
     .info {
         flex: 1;
         min-width: 0;
@@ -585,6 +675,10 @@ async function share() {
     .model {
         width: 420px;
         height: 420px;
+    }
+
+    .shout {
+        font-size: 120px;
     }
 
     .name {

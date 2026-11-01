@@ -13,6 +13,7 @@ props:      spiritId ('kopi', 'chilli-crab', ...), color, label (read out by scr
 import { onMounted, onBeforeUnmount, ref } from 'vue'
 import * as THREE from 'three'
 import { buildSpirit, addSpiritLights, addSpiritShadow } from '@/three/spiritModel'
+import { playEmote as runEmote, EMOTE_FOR, EMOTE_SECONDS, EMOTE_LENGTH } from '@/three/spiritEmotes'
 import { lessMotion } from '@/lib/useSettings'
 
 const props = defineProps({
@@ -23,6 +24,20 @@ const props = defineProps({
 
 const host = ref(null)
 let renderer, scene, camera, model, removeShadow, frameId, resizeObserver
+
+// when the current emote started, on the same clock as the idle animation (null = just standing there)
+let emoteStart = null
+let clock = null
+
+// the page calls this when the Spirit is tapped, and uses the answer to decide whether to put the
+// Spirit's shout on screen. Returns false when nothing started.
+function playEmote() {
+    if (!clock || emoteStart !== null) return false   // no clock = reduced motion; already performing
+    emoteStart = clock.getElapsedTime()
+    return true
+}
+
+defineExpose({ playEmote })
 
 onMounted(() => {
     const el = host.value
@@ -58,13 +73,34 @@ onMounted(() => {
 
     if (reduceMotion) return
 
-    // gentle bob up and down, sway left and right, and a blink every 4 seconds
-    const clock = new THREE.Clock()
+    const emote = EMOTE_FOR[props.spiritId]
+    const emoteSeconds = EMOTE_LENGTH[emote] ?? EMOTE_SECONDS
+    clock = new THREE.Clock()
+
     const animate = () => {
         const t = clock.getElapsedTime()
-        model.spirit.position.y = Math.sin(t * 1.6) * 0.08
-        model.spirit.rotation.y = Math.sin(t * 0.7) * 0.35
-        model.blink(t % 4 < 0.12 ? 0.15 : 1)
+
+        // Start every frame from the resting pose. An emote writes on top of this, so whatever it
+        // changed is wiped next frame instead of building up and leaving the Spirit lopsided.
+        model.spirit.position.set(0, Math.sin(t * 1.6) * 0.08, 0)   // gentle bob
+        model.spirit.rotation.set(0, Math.sin(t * 0.7) * 0.35, 0)   // gentle sway
+        model.spirit.scale.set(1, 1, 1)
+        for (const limb of model.limbs) limb.rotation.z = 0
+        for (const arm of model.arms) {
+            arm.shoulder.rotation.set(0, arm.rest[1], arm.rest[0])
+            arm.elbow.rotation.set(0, 0, arm.rest[2])
+            arm.setHand('fist')
+        }
+        model.parts.durian?.reset()                                 // spikes, crown and jewel as drawn
+
+        if (emoteStart !== null) {
+            const p = (t - emoteStart) / emoteSeconds
+            if (p >= 1) emoteStart = null                           // done: back to just bobbing
+            else runEmote(model, emote, p)
+        }
+
+        model.blink(t % 4 < 0.12 ? 0.15 : 1)                        // a blink every 4 seconds
+
         renderer.render(scene, camera)
         frameId = requestAnimationFrame(animate)
     }
