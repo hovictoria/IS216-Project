@@ -11,6 +11,8 @@ purpose:    - the Me tab (/me), from the Me handoff (ME_SPEC.md), trimmed to wha
             - data: GET /api/me/profile through stores/profile.js; settings change straight away and save in
               the background (lib/useSettings.js)
             - Edit profile / Change password / Delete account open over the page (components/profile/)
+            - Language: our own pop-up (English, 中文, Bahasa Melayu, தமிழ்). Google Translate runs hidden
+              in the page and the pop-up drives it
 note:       replaces views/profile.vue (the first Me page). Its Edit / Delete code lives on in components/profile
 ---------------------------------------------------------------------------------------------------------->
 
@@ -98,8 +100,89 @@ async function onSignOut() {
     router.push('/')
 }
 
+/* =========================================================
+   Language (our pop-up drives a hidden Google Translate)
+   ========================================================= */
+const LANGUAGES = [
+    { code: 'en',    name: 'English',       label: 'English' },
+    { code: 'zh-CN', name: '中文',           label: 'Chinese' },
+    { code: 'ms',    name: 'Bahasa Melayu', label: 'Malay' },
+    { code: 'ta',    name: 'தமிழ்',          label: 'Tamil' },
+]
+
+function savedLanguage() {
+    try { return localStorage.getItem('mg-language') || 'en' } catch { return 'en' }
+}
+
+const language = ref(savedLanguage())            // the language in use
+const pendingLanguage = ref(language.value)      // the radio they picked, before Save
+const showLanguage = ref(false)
+const languageName = computed(() => LANGUAGES.find((l) => l.code === language.value)?.name ?? 'English')
+
+function openLanguage() {
+    pendingLanguage.value = language.value
+    showLanguage.value = true
+}
+
+function clearTranslateCookie() {
+    const gone = 'googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
+    document.cookie = gone
+    document.cookie = `${gone} domain=${location.hostname};`
+}
+
+function saveLanguage() {
+    const code = pendingLanguage.value
+    language.value = code
+    try { localStorage.setItem('mg-language', code) } catch { /* private mode */ }
+    showLanguage.value = false
+
+    if (code === 'en') {
+        // back to the original text: clear Google's cookie, reload if the page was translated
+        clearTranslateCookie()
+        if (document.documentElement.className.includes('translated')) location.reload()
+        return
+    }
+
+    // drive Google's hidden <select> so the page switches without a reload
+    const select = document.querySelector('select.goog-te-combo')
+    if (select) {
+        select.value = code
+        select.dispatchEvent(new Event('change'))
+    }
+}
+
+// load the Google Translate script once, then start the (hidden) widget
+function loadGoogleTranslate() {
+    // the callback must be on window, because Google calls it by name
+    window.googleTranslateElementInit = () => {
+        new window.google.translate.TranslateElement(
+            {
+                pageLanguage: 'en',
+                includedLanguages: 'en,zh-CN,ms,ta',
+                autoDisplay: false,
+            },
+            'google_translate_element'
+        )
+    }
+
+    // don't add the script twice if they revisit the tab
+    if (document.getElementById('google-translate-script')) {
+        if (window.google?.translate) window.googleTranslateElementInit()
+        return
+    }
+
+    const script = document.createElement('script')
+    script.id = 'google-translate-script'
+    script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit'
+    script.async = true
+    document.body.appendChild(script)
+}
+
 // fresh numbers every time the tab opens (the store already has the last ones, so it shows straight away)
-onMounted(() => profile.load())
+onMounted(() => {
+    profile.load()
+    loadGoogleTranslate()       // safe straight away: the hidden div is not inside v-if="me"
+})
 </script>
 
 <template>
@@ -260,14 +343,15 @@ onMounted(() => profile.load())
                                 <path d="M32 4.5 C 35.5 7.5, 38.5 9.5, 42 11 C 38 13, 34.5 16, 32.5 19.5" />
                             </svg>
                         </button>
-                        <!-- Language: English only for now (placeholder) -->
-                        <div class="account-row">
-                            <span class="setting-text">
-                                <span class="setting-name">Language</span>
-                                <span class="setting-note">More languages coming soon</span>
-                            </span>
-                            <span class="row-value">English</span>
-                        </div>
+                        <!-- Language: opens the Language pop-up -->
+                        <button type="button" class="account-row" @click="openLanguage">
+                            <span class="setting-name">Language</span>
+                            <span class="row-value notranslate" translate="no">{{ languageName }}</span>
+                            <svg class="arrow" viewBox="0 0 46 24" aria-hidden="true">
+                                <path d="M3 13.5 C 13 11, 26 13.5, 41 11" />
+                                <path d="M32 4.5 C 35.5 7.5, 38.5 9.5, 42 11 C 38 13, 34.5 16, 32.5 19.5" />
+                            </svg>
+                        </button>
                         <!-- Admins only: manage users -->
                         <RouterLink v-if="auth.isAdmin" to="/admin" class="account-row admin-row">
                             <span class="setting-text">
@@ -290,6 +374,44 @@ onMounted(() => profile.load())
         <EditProfile v-if="open === 'edit'" @close="open = null" @delete="open = 'delete'" />
         <ChangePassword v-if="open === 'password'" @close="open = null" />
         <DeleteAccount v-if="open === 'delete'" @close="closeDelete" />
+
+        <!-- Google Translate engine: hidden, driven by the Language pop-up (not inside v-if="me") -->
+        <div id="google_translate_element" class="translate-engine" aria-hidden="true"></div>
+
+        <!-- Language pop-up -->
+        <div v-if="showLanguage" class="lang-backdrop" @click.self="showLanguage = false">
+            <div class="lang-modal" role="dialog" aria-modal="true" aria-labelledby="language-title">
+                <button type="button" class="lang-close" aria-label="Close" @click="showLanguage = false">×</button>
+                <h2 id="language-title" class="lang-title">
+                    <HandUnderline>Language</HandUnderline>
+                </h2>
+                <p class="lang-sub">Menus, game instructions and place stories will use this language.</p>
+
+                <div class="lang-grid" role="radiogroup" aria-label="Language">
+                    <button v-for="l in LANGUAGES" :key="l.code" type="button" role="radio"
+                        class="lang-option notranslate" translate="no"
+                        :aria-checked="pendingLanguage === l.code" :class="{ on: pendingLanguage === l.code }"
+                        @click="pendingLanguage = l.code">
+                        <span class="lang-text">
+                            <span class="lang-name">{{ l.name }}</span>
+                            <span v-if="l.name !== l.label" class="lang-label">{{ l.label }}</span>
+                        </span>
+                        <span class="lang-radio" aria-hidden="true"></span>
+                    </button>
+                </div>
+
+                <div class="lang-actions">
+                    <button type="button" class="outline-btn" @click="showLanguage = false">Cancel</button>
+                    <button type="button" class="save-btn" @click="saveLanguage">
+                        <span>Save language</span>
+                        <svg class="arrow" viewBox="0 0 46 24" aria-hidden="true">
+                            <path d="M3 13.5 C 13 11, 26 13.5, 41 11" />
+                            <path d="M32 4.5 C 35.5 7.5, 38.5 9.5, 42 11 C 38 13, 34.5 16, 32.5 19.5" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -543,7 +665,7 @@ onMounted(() => profile.load())
     color: var(--muted);
 }
 
-/* outlined pill (Edit profile on laptop, Sign out) */
+/* outlined pill (Edit profile on laptop, Sign out, Cancel) */
 .outline-btn {
     min-height: 54px;
     padding: 0 24px;
@@ -758,6 +880,147 @@ button.account-row .setting-name {
 }
 
 /* =========================================================
+   Language: hidden Google engine + pop-up
+   ========================================================= */
+/* the Google widget stays in the page, but off-screen */
+.translate-engine {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+}
+
+.lang-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(22, 20, 18, 0.35);
+}
+
+.lang-modal {
+    position: relative;
+    width: 100%;
+    max-width: 560px;
+    padding: 28px;
+    border-radius: var(--radius-card);
+    background: var(--paper);
+    box-shadow: 0 20px 60px rgba(22, 20, 18, 0.3);
+}
+
+.lang-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--white);
+    font-size: 24px;
+    line-height: 1;
+    color: var(--ink);
+}
+
+.lang-title {
+    margin: 0 0 6px;
+    font-family: var(--font);
+    font-size: 40px;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.06em;
+}
+
+.lang-sub {
+    margin: 0 0 18px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.lang-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.lang-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 76px;
+    padding: 12px 16px;
+    border: 1.5px solid rgba(22, 20, 18, 0.15);
+    border-radius: 18px;
+    background: var(--white);
+    color: var(--ink);
+    text-align: left;
+}
+
+.lang-option.on {
+    border: 2px solid var(--ink);
+}
+
+.lang-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.lang-name {
+    font-size: 20px;
+    font-weight: 800;
+}
+
+.lang-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--muted);
+}
+
+.lang-radio {
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    border: 2px solid var(--ink);
+    border-radius: 50%;
+}
+
+.lang-option.on .lang-radio {
+    background: radial-gradient(circle, var(--ink) 0 45%, transparent 50%);
+}
+
+.lang-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 18px;
+}
+
+.save-btn {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 54px;
+    padding: 0 24px;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: var(--ink);
+    color: var(--white);
+    font-size: 18px;
+    font-weight: 800;
+}
+
+@media (max-width: 480px) {
+    .lang-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* =========================================================
    Laptop (1024px+): profile column left, settings right
    ========================================================= */
 @media (min-width: 1024px) {
@@ -866,5 +1129,24 @@ button.account-row .setting-name {
     .segmented button {
         min-height: 44px;
     }
+}
+</style>
+
+<!-- NOT scoped: Google injects its own elements, which scoped styles can't reach.
+     Hides Google's top banner and stops it pushing the page down. -->
+<style>
+.goog-te-banner-frame,
+#goog-gt-tt,
+.goog-te-balloon-frame {
+    display: none !important;
+}
+
+body {
+    top: 0 !important;
+}
+
+.goog-text-highlight {
+    background: none !important;
+    box-shadow: none !important;
 }
 </style>
