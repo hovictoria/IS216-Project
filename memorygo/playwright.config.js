@@ -1,5 +1,14 @@
 import process from 'node:process'
 import { defineConfig, devices } from '@playwright/test'
+import fs from 'node:fs'
+
+// The Supabase test account the tests sign in with (see e2e/auth.setup.js).
+// Read by hand rather than with dotenv, so the front end gains no dependency just for the tests.
+// .env.e2e is git-ignored: it holds a real password.
+for (const line of fs.existsSync('.env.e2e') ? fs.readFileSync('.env.e2e', 'utf8').split('\n') : []) {
+  const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)$/)
+  if (match) process.env[match[1]] ??= match[2].trim().replace(/^["']|["']$/g, '')
+}
 
 /**
  * Read environment variables from file.
@@ -45,24 +54,31 @@ export default defineConfig({
 
   /* Configure projects for major browsers */
   projects: [
+    /* Signs in once and saves the session. Every spec below reuses it, so no test logs in again. */
+    {
+      name: 'setup',
+      testMatch: /.*\.setup\.js/,
+    },
     {
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
+        storageState: 'e2e/.auth/session.json',
       },
+      dependencies: ['setup'],
     },
-    {
-      name: 'firefox',
-      use: {
-        ...devices['Desktop Firefox'],
-      },
-    },
-    {
-      name: 'webkit',
-      use: {
-        ...devices['Desktop Safari'],
-      },
-    },
+    /* Firefox and WebKit are off while we build the suite: three browsers triples the run time.
+       Turn them back on for a final check. */
+    // {
+    //   name: 'firefox',
+    //   use: { ...devices['Desktop Firefox'], storageState: 'e2e/.auth/session.json' },
+    //   dependencies: ['setup'],
+    // },
+    // {
+    //   name: 'webkit',
+    //   use: { ...devices['Desktop Safari'], storageState: 'e2e/.auth/session.json' },
+    //   dependencies: ['setup'],
+    // },
 
     /* Test against mobile viewports. */
     // {
@@ -97,14 +113,22 @@ export default defineConfig({
   // outputDir: 'test-results/',
 
   /* Run your local dev server before starting the tests */
-  webServer: {
-    /**
-     * Use the dev server by default for faster feedback loop.
-     * Use the preview server on CI for more realistic testing.
-     * Playwright will re-use the local server if there is already a dev-server running.
-     */
-    command: process.env.CI ? 'npm run preview' : 'npm run dev',
-    port: process.env.CI ? 4173 : 5173,
-    reuseExistingServer: !process.env.CI,
-  },
+  webServer: [
+    {
+      /**
+       * Use the dev server by default for faster feedback loop.
+       * Use the preview server on CI for more realistic testing.
+       * Playwright will re-use the local server if there is already a dev-server running.
+       */
+      command: process.env.CI ? 'npm run preview' : 'npm run dev',
+      port: process.env.CI ? 4173 : 5173,
+      reuseExistingServer: !process.env.CI,
+    },
+    {
+      /* The API the pages read their data from. Without it the app loads but every list is empty. */
+      command: 'npm run dev --prefix ../server',
+      port: 8000,
+      reuseExistingServer: true,
+    },
+  ],
 })
