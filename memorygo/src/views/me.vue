@@ -205,7 +205,7 @@ onMounted(() => {
                                     :src="pictureOf(me.newestSpirits[0].id)" alt="" class="peek" />
                             </span>
                             <div class="who-text">
-                                <h2 class="name">
+                                <h2 class="name" translate="no">
                                     <template v-if="nameStart">{{ `${nameStart} ` }}</template><HandUnderline>{{ nameEnd }}</HandUnderline>
                                 </h2>
                                 <p class="joined">{{ joined }}</p>
@@ -340,7 +340,7 @@ onMounted(() => {
                         </button>
                         <!-- Language: opens the Language pop-up -->
                         <button type="button" class="account-row" @click="openLanguage">
-                            <span class="setting-name">Language</span>
+                            <span class="setting-name notranslate" translate="no">Language</span>
                             <span class="row-value notranslate" translate="no">{{ languageName }}</span>
                             <svg class="arrow" viewBox="0 0 46 24" aria-hidden="true">
                                 <path d="M3 13.5 C 13 11, 26 13.5, 41 11" />
