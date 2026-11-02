@@ -13,17 +13,20 @@ import { test, expect } from '@playwright/test'
 
 const TOTAL_SPIRITS = 24
 
-// wait for the collection to arrive from /api/spirits — until then the page shows "Loading your spirits…"
+// Wait until the collection has actually arrived from /api/spirits.
+// Waiting for "Loading your spirits…" to disappear is NOT enough: that paragraph may not have
+// rendered yet when we look, so the check passes instantly while the page is still empty.
+// The grid only fills once the data is in, so wait for the tiles themselves.
 async function openCollection(page) {
     await page.goto('/spirits')
-    await expect(page.getByText('Loading your spirits…')).toHaveCount(0, { timeout: 15000 })
-    await expect(page.getByRole('progressbar', { name: 'Spirits found' })).toBeVisible()
+    await expect(page.getByTestId('spirit-tile')).toHaveCount(TOTAL_SPIRITS, { timeout: 15000 })
 }
 
-// how many the signed-in account has found, read off the "7 of 24 found" label
+// how many the signed-in account has found, straight off the progress bar's own value
+// (the page binds aria-valuenow to found.length, so no text parsing is needed)
 async function foundCount(page) {
-    const label = await page.getByText(/\d+ of \d+ found/).first().innerText()
-    return Number(label.match(/^(\d+) of/)[1])
+    const value = await page.getByRole('progressbar', { name: 'Spirits found' }).getAttribute('aria-valuenow')
+    return Number(value)
 }
 
 test.describe('Spirits collection', () => {
