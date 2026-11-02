@@ -40,3 +40,7 @@ __screenshots__/
 
 test-results/
 playwright-report/
+
+# end-to-end testing: the test account password, and the signed-in session it saves
+.env.e2e
+e2e/.auth/

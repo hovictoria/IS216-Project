@@ -231,9 +231,12 @@ onMounted(async () => {
                 <p v-if="visibleSpirits.length === 0" class="note">None here yet.</p>
                 <ul v-else class="grid">
                     <li v-for="s in visibleSpirits" :key="s.id">
-                        <RouterLink :to="`/spirits/${s.id}`" class="tile" :class="{ locked: !isFound(s.id) }">
+                        <!-- data-testid: a stable handle for the end-to-end tests (e2e/spirits.spec.js),
+                             so they do not break when a class or wording changes -->
+                        <RouterLink :to="`/spirits/${s.id}`" class="tile" :class="{ locked: !isFound(s.id) }"
+                            data-testid="spirit-tile">
                             <img :src="isFound(s.id) ? pictureOf(s.id) : lockedPicture" alt="" class="tile-picture" />
-                            <span class="tile-name">{{ isFound(s.id) ? s.name : '???' }}</span>
+                            <span class="tile-name" data-testid="spirit-tile-name">{{ isFound(s.id) ? s.name : '???' }}</span>
                             <span class="tile-place">{{ s.placeName }}</span>
                             <span v-if="isFound(s.id)" class="tile-rarity" :class="`rarity-${s.rarity.toLowerCase()}`">
                                 {{ s.rarity }}
