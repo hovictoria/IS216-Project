@@ -1,11 +1,17 @@
 import process from 'node:process'
 import { defineConfig, devices } from '@playwright/test'
 import fs from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
+// Found next to this file, not from the folder the tests were started in
+// (the VS Code Playwright extension starts them from the repo root, not memorygo/)
+const ENV_FILE = fileURLToPath(new URL('./.env.e2e', import.meta.url))
+const SESSION_FILE = fileURLToPath(new URL('./e2e/.auth/session.json', import.meta.url))
 
 // The Supabase test account the tests sign in with (see e2e/auth.setup.js).
 // Read by hand rather than with dotenv, so the front end gains no dependency just for the tests.
 // .env.e2e is git-ignored: it holds a real password.
-for (const line of fs.existsSync('.env.e2e') ? fs.readFileSync('.env.e2e', 'utf8').split('\n') : []) {
+for (const line of fs.existsSync(ENV_FILE) ? fs.readFileSync(ENV_FILE, 'utf8').split('\n') : []) {
   const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)$/)
   if (match) process.env[match[1]] ??= match[2].trim().replace(/^["']|["']$/g, '')
 }
@@ -63,7 +69,7 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
-        storageState: 'e2e/.auth/session.json',
+        storageState: SESSION_FILE,
       },
       dependencies: ['setup'],
     },
@@ -71,12 +77,12 @@ export default defineConfig({
        Turn them back on for a final check. */
     // {
     //   name: 'firefox',
-    //   use: { ...devices['Desktop Firefox'], storageState: 'e2e/.auth/session.json' },
+    //   use: { ...devices['Desktop Firefox'], storageState: SESSION_FILE },
     //   dependencies: ['setup'],
     // },
     // {
     //   name: 'webkit',
-    //   use: { ...devices['Desktop Safari'], storageState: 'e2e/.auth/session.json' },
+    //   use: { ...devices['Desktop Safari'], storageState: SESSION_FILE },
     //   dependencies: ['setup'],
     // },
 
