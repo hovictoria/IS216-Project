@@ -56,9 +56,6 @@ export default defineConfig({
 
     /* Only on CI systems run the tests headless */
     headless: !!process.env.CI,
-
-    /* Slow motion to watch a run: SLOWMO=800 waits 800 ms before every click/type. Off (0) by default */
-    launchOptions: { slowMo: Number(process.env.SLOWMO) || 0 },
   },
 
   /* Configure projects for major browsers */
