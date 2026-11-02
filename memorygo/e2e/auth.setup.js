@@ -28,8 +28,11 @@ setup('sign in once and save the session', async ({ page }) => {
     }
 
     await page.goto('/login')
-    await page.getByLabel('Email').fill(email)
-    await page.getByLabel('Password').fill(password)
+    // by id, not by label: the password field's "Show" toggle is labelled "Show password",
+    // so getByLabel('Password') matches the input AND that button. The ids are set by hand
+    // in login.vue, so they are stable.
+    await page.locator('#login-email').fill(email)
+    await page.locator('#login-password').fill(password)
     await page.getByRole('button', { name: 'Sign in' }).click()
 
     // login.vue pushes to /map once Supabase accepts the password
