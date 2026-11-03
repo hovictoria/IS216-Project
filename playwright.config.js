@@ -2,11 +2,11 @@ import process from 'node:process'
 import { defineConfig, devices } from '@playwright/test'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
-
-// Found next to this file, not from the folder the tests were started in
-// (the VS Code Playwright extension starts them from the repo root, not memorygo/)
+import dotenv from 'dotenv'
+dotenv.config({ path: '.env.e2e' })
 const ENV_FILE = fileURLToPath(new URL('./.env.e2e', import.meta.url))
 const SESSION_FILE = fileURLToPath(new URL('./e2e/.auth/session.json', import.meta.url))
+const ADMIN_SESSION_FILE = fileURLToPath(new URL('./e2e/.auth/admin.json', import.meta.url))
 
 // The Supabase test account the tests sign in with (see e2e/auth.setup.js).
 // Read by hand rather than with dotenv, so the front end gains no dependency just for the tests.
@@ -26,7 +26,7 @@ for (const line of fs.existsSync(ENV_FILE) ? fs.readFileSync(ENV_FILE, 'utf8').s
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
-  testDir: './e2e',
+  testDir: 'e2e',
   /* Maximum time one test can run for. */
   timeout: 30 * 1000,
   expect: {
@@ -62,18 +62,34 @@ export default defineConfig({
 
   /* Configure projects for major browsers */
   projects: [
-    /* Signs in once and saves the session. Every spec below reuses it, so no test logs in again. */
+    /* Signs in once as an ordinary player and saves the session. */
     {
       name: 'setup',
-      testMatch: /.*\.setup\.js/,
+      testMatch: /auth\.setup\.js/,
     },
     {
       name: 'chromium',
+      testIgnore: /admin-access\.spec\.js/,
       use: {
         ...devices['Desktop Chrome'],
         storageState: SESSION_FILE,
       },
       dependencies: ['setup'],
+    },
+
+    /* Signs in once as an admin and saves a separate session. */
+    {
+      name: 'admin-setup',
+      testMatch: /admin\.setup\.js/,
+    },
+    {
+      name: 'admin',
+      testMatch: /admin-access\.spec\.js/,
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: ADMIN_SESSION_FILE,
+      },
+      dependencies: ['admin-setup'],
     },
     /* Firefox and WebKit are off while we build the suite: three browsers triples the run time.
        Turn them back on for a final check. */
@@ -123,18 +139,14 @@ export default defineConfig({
   /* Run your local dev server before starting the tests */
   webServer: [
     {
-      /**
-       * Use the dev server by default for faster feedback loop.
-       * Use the preview server on CI for more realistic testing.
-       * Playwright will re-use the local server if there is already a dev-server running.
-       */
-      command: process.env.CI ? 'npm run preview' : 'npm run dev',
+      command: process.env.CI ? 'npm run preview' : 'pnpm run dev',
+      cwd: './memorygo',
       port: process.env.CI ? 4173 : 5173,
       reuseExistingServer: !process.env.CI,
     },
     {
-      /* The API the pages read their data from. Without it the app loads but every list is empty. */
-      command: 'npm run dev --prefix ../server',
+      command: 'pnpm run dev',
+      cwd: './server',
       port: 8000,
       reuseExistingServer: true,
     },

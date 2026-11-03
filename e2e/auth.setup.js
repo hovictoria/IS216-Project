@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url'
 import { test as setup, expect } from '@playwright/test'
 
 // next to this file, whichever folder the tests were started from (same file as playwright.config.js)
-export const SESSION_FILE = fileURLToPath(new URL('./.auth/session.json', import.meta.url))
+export const SESSION_FILE = fileURLToPath(new URL('.auth/session.json', import.meta.url))
 
 setup('sign in once and save the session', async ({ page }) => {
     const email = process.env.E2E_EMAIL
