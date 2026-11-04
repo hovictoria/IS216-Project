@@ -64,17 +64,18 @@ export default defineConfig({
   projects: [
     /* Signs in once as an ordinary player and saves the session. */
     {
-      name: 'setup',
+      name: 'player-setup',
       testMatch: /auth\.setup\.js/,
     },
+    /* Every test that runs as an ordinary signed-in player: the whole suite except the admin ones. */
     {
-      name: 'chromium',
+      name: 'player',
       testIgnore: /admin-access\.spec\.js/,
       use: {
         ...devices['Desktop Chrome'],
         storageState: SESSION_FILE,
       },
-      dependencies: ['setup'],
+      dependencies: ['player-setup'],
     },
 
     /* Signs in once as an admin and saves a separate session. */
@@ -96,12 +97,12 @@ export default defineConfig({
     // {
     //   name: 'firefox',
     //   use: { ...devices['Desktop Firefox'], storageState: SESSION_FILE },
-    //   dependencies: ['setup'],
+    //   dependencies: ['player-setup'],
     // },
     // {
     //   name: 'webkit',
     //   use: { ...devices['Desktop Safari'], storageState: SESSION_FILE },
-    //   dependencies: ['setup'],
+    //   dependencies: ['player-setup'],
     // },
 
     /* Test against mobile viewports. */

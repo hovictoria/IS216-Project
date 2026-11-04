@@ -142,7 +142,7 @@ pnpm test:e2e -g "level-up"                    # only tests whose name matches
 pnpm exec playwright show-report               # open the HTML report of the last run
 ```
 
-**In VS Code:** install the **Playwright Test for VS Code** extension, open the Testing panel (flask icon), tick the **chromium** project under *Playwright → Projects*, then press ▶ next to a file or test. Tick **Show browser** to watch it, or **Show trace viewer** to step through each action afterwards.
+**In VS Code:** install the **Playwright Test for VS Code** extension, open the Testing panel (flask icon), tick the **player** project under *Playwright → Projects*, then press ▶ next to a file or test. Tick **Show browser** to watch it, or **Show trace viewer** to step through each action afterwards.
 
 ### What is covered
 
