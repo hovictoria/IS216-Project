@@ -22,6 +22,10 @@ const emailField = (page) => page.getByLabel('Email')
 const sendButton = (page) => page.getByRole('button', { name: 'Send link' })
 
 test.describe('Forgot password', () => {
+    // The dev server compiles a route the first time it is asked for, so a cold first visit here can
+    // outlast the normal limit while several workers are warming other pages. test.slow() triples it.
+    test.slow()
+
     test('"Forgot password?" on the sign-in page opens it', async ({ page }) => {
         await page.goto('/login')
         await page.getByRole('link', { name: 'Forgot password?' }).click()
