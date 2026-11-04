@@ -54,10 +54,12 @@ pnpm build
 
 # Runs the end-to-end tests
 pnpm test:e2e
-# Runs the tests only on Chromium
-pnpm test:e2e --project=chromium
+# Runs one feature's tests. The groups are named after the part of the app they cover:
+# sign-in, sign-up, forgot-password, navigation, map, spirits, games, journey,
+# progression, me-page, edit-profile, admin-refused, admin
+pnpm test:e2e --project=spirits
 # Runs the tests of a specific file
-pnpm test:e2e tests/example.spec.ts
+pnpm test:e2e e2e/spirits.spec.js
 # Runs the tests in debug mode
 pnpm test:e2e --debug
 ```

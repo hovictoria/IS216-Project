@@ -22,6 +22,28 @@ for (const line of fs.existsSync(ENV_FILE) ? fs.readFileSync(ENV_FILE, 'utf8').s
  */
 // require('dotenv').config();
 
+// The parts of the app, and the spec file that tests each one. A "project" is Playwright's word for a
+// group of tests that share settings; naming them after features rather than after the browser means a
+// run tells you what broke, not what it ran in.
+// Everything here runs signed in as an ordinary player. The admin tests are separate, further down,
+// because they need a different account.
+const PLAYER_SUITES = [
+  ['sign-in', /auth\.spec\.js/],
+  ['sign-up', /signup\.spec\.js/],
+  ['forgot-password', /forgot-password\.spec\.js/],
+  ['navigation', /navigation\.spec\.js/],
+  ['map', /map\.spec\.js/],
+  ['spirits', /spirits\.spec\.js/],
+  ['games', /games\.spec\.js/],
+  ['journey', /journey\.spec\.js/],
+  ['progression', /progression\.spec\.js/],
+  // the slash matters: plain /profile\.spec\.js/ also matches edit-profile.spec.js,
+  // which would quietly run those tests twice, in two different projects
+  ['me-page', /[\\/]profile\.spec\.js$/],
+  ['edit-profile', /edit-profile\.spec\.js/],
+  ['admin-refused', /notadmin\.spec\.js/],
+]
+
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
@@ -64,18 +86,22 @@ export default defineConfig({
   projects: [
     /* Signs in once as an ordinary player and saves the session. */
     {
-      name: 'setup',
+      name: 'player-setup',
       testMatch: /auth\.setup\.js/,
     },
-    {
-      name: 'chromium',
-      testIgnore: /admin-access\.spec\.js/,
+    /* One project per feature, so a run says WHICH PART OF THE APP a test belongs to:
+         ✓ [spirits] › e2e/spirits.spec.js …     instead of     ✓ [chromium] › e2e/spirits.spec.js …
+       They all sign in as the same ordinary player and all run in Chromium; only the name differs.
+       Adding a spec file? Add it here too, or it will not run. */
+    ...PLAYER_SUITES.map(([name, file]) => ({
+      name,
+      testMatch: file,
       use: {
         ...devices['Desktop Chrome'],
         storageState: SESSION_FILE,
       },
-      dependencies: ['setup'],
-    },
+      dependencies: ['player-setup'],
+    })),
 
     /* Signs in once as an admin and saves a separate session. */
     {
@@ -96,12 +122,12 @@ export default defineConfig({
     // {
     //   name: 'firefox',
     //   use: { ...devices['Desktop Firefox'], storageState: SESSION_FILE },
-    //   dependencies: ['setup'],
+    //   dependencies: ['player-setup'],
     // },
     // {
     //   name: 'webkit',
     //   use: { ...devices['Desktop Safari'], storageState: SESSION_FILE },
-    //   dependencies: ['setup'],
+    //   dependencies: ['player-setup'],
     // },
 
     /* Test against mobile viewports. */
