@@ -31,10 +31,35 @@ async function setSwitch(page, locator, wanted) {
     await expect(locator()).toHaveAttribute('aria-checked', String(wanted))
 }
 
+// Open the Me page and WAIT FOR IT TO SETTLE before touching anything.
+//
+// The app asks for the profile twice on this page — main.js:43 and me.vue:173 — and each answer
+// re-applies the account's settings. Change a setting while the second answer is still in flight and
+// it is quietly reverted a moment later, which failed this test about one run in three.
+// Nothing here fixes that race in the app; it only stops the test racing against it.
+// Choose a text size and wait for the account to be told, not just for the screen to change.
+async function pickTextSize(page, name) {
+    const saved = page.waitForResponse(
+        (r) => r.url().includes('/me/settings') && r.request().method() === 'PUT',
+        { timeout: 15000 },
+    )
+    await page.getByRole('radio', { name }).click()
+    await expect(page.getByRole('radio', { name })).toHaveAttribute('aria-checked', 'true')
+    await saved
+}
+
 async function openMe(page) {
+    let profileAnswers = 0
+    page.on('response', (r) => { if (r.url().includes('/me/profile')) profileAnswers++ })
+
     await page.goto('/me')
-    // the profile arrives from GET /api/me/profile; the level chip only renders once it has
+    // the level chip only renders once a profile has arrived
     await expect(page.getByText(/^Level \d+$/)).toBeVisible({ timeout: 15000 })
+
+    // give the second answer its chance to land; one is enough to proceed if it never comes
+    await expect.poll(() => profileAnswers, { timeout: 5000, message: 'waiting for the profile to settle' })
+        .toBeGreaterThanOrEqual(2)
+        .catch(() => { /* only one request was made; nothing left to overwrite us */ })
 }
 
 // Pin the browser's own reduce-motion preference. me.vue falls back to the OPERATING SYSTEM's
@@ -60,14 +85,14 @@ test.describe('Me page', () => {
     test('changing the text size takes effect immediately', async ({ page }) => {
         await openMe(page)
 
-        await page.getByRole('radio', { name: 'Larger text' }).click()
-        await expect(page.getByRole('radio', { name: 'Larger text' })).toHaveAttribute('aria-checked', 'true')
-        expect(await htmlClass(page)).toContain('text-larger')
+        // Each click is also saved to the account in the background. Wait for that save before the next
+        // one, so the two are never in flight together — the second could otherwise be overtaken.
+        await pickTextSize(page, 'Larger text')
+        await expect(page.locator('html')).toHaveClass(/text-larger/)
 
         // and back, so the account is left as it was found
-        await page.getByRole('radio', { name: 'Normal text size' }).click()
-        await expect(page.getByRole('radio', { name: 'Normal text size' })).toHaveAttribute('aria-checked', 'true')
-        expect(await htmlClass(page)).not.toContain('text-larger')
+        await pickTextSize(page, 'Normal text size')
+        await expect(page.locator('html')).not.toHaveClass(/text-larger/)
     })
 
     // NOT TESTED HERE: switching Reduce motion / Solid backgrounds and reading the value back.

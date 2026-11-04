@@ -34,12 +34,28 @@ async function finishGame(page) {
 
 const levelUpPopup = (page) => page.getByRole('dialog', { name: /You reached Level/ })
 
-// Let the real profile reply through, but swap in our own XP, so the rest of the Me page loads as usual
+// Let the real profile reply through, but swap in our own XP, so the rest of the Me page loads as usual.
+//
+// The app asks for the profile TWICE on this page — once from main.js and once from me.vue — so this
+// handler runs twice, and whichever request the page gives up on has its response thrown away while we
+// are still reading it ("Response has been disposed"). That made these tests fail about one run in two,
+// alternating between them. So: read the body defensively, and let a dead request go.
 async function fakeProfileXp(page, xp) {
+    let cached = null        // the real profile, kept so the second request needs no second fetch
+
     await page.route('**/api/me/profile', async (route) => {
-        const response = await route.fetch()
-        const profile = await response.json()
-        await route.fulfill({ response, json: { ...profile, xp } })
+        if (cached) return route.fulfill({ json: { ...cached, xp } })
+
+        // Two attempts: a request the page drops mid-flight disposes its own response, which is not a
+        // reason to give up — the next one usually survives. Letting the REAL profile through instead
+        // would quietly undo the mock and fail the assertion below with the account's true XP.
+        for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+                cached = await (await route.fetch()).json()
+                return await route.fulfill({ json: { ...cached, xp } })
+            } catch { /* dropped; try again */ }
+        }
+        try { await route.fallback() } catch { /* the request is long gone */ }
     })
 }
 
