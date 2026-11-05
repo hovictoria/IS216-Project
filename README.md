@@ -3,8 +3,6 @@
 **Memory Go** is an interactive exploration and cognitive game designed for older adults. Players explore a map of real Singapore heritage places, travel to them, play a short memory game at each one, and collect the 24 Memory Spirits hiding across the island.
 
 ## 🔗 Live App
-
-> **TO FILL IN BEFORE SUBMITTING.**
 >
 > | | |
 > | ---- | ---- |
@@ -14,7 +12,7 @@
 > | **Admin email** | `admin@gmail.com` |
 > | **Admin password** | `123456` |
 >
-> Use a throwaway account for the demo login, never a personal or admin one — this repository is public.
+
 
 Run it yourself? See [Getting Started](#-getting-started).
 
