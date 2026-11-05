@@ -300,8 +300,6 @@ IS216-Project/
 
 ## 👥 Project Team
 
-> **TO FILL IN:** replace *Member N* with real names, and check each role still matches what that person built.
-
 | Member   | Main Feature                              |
 | -------- | ----------------------------------------- |
 | Yule | 🗺️ Map API integration            |
