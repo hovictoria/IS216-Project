@@ -2,11 +2,11 @@ import process from 'node:process'
 import { defineConfig, devices } from '@playwright/test'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
-
-// Found next to this file, not from the folder the tests were started in
-// (the VS Code Playwright extension starts them from the repo root, not memorygo/)
+import dotenv from 'dotenv'
+dotenv.config({ path: '.env.e2e' })
 const ENV_FILE = fileURLToPath(new URL('./.env.e2e', import.meta.url))
 const SESSION_FILE = fileURLToPath(new URL('./e2e/.auth/session.json', import.meta.url))
+const ADMIN_SESSION_FILE = fileURLToPath(new URL('./e2e/.auth/admin.json', import.meta.url))
 
 // The Supabase test account the tests sign in with (see e2e/auth.setup.js).
 // Read by hand rather than with dotenv, so the front end gains no dependency just for the tests.
@@ -22,11 +22,33 @@ for (const line of fs.existsSync(ENV_FILE) ? fs.readFileSync(ENV_FILE, 'utf8').s
  */
 // require('dotenv').config();
 
+// The parts of the app, and the spec file that tests each one. A "project" is Playwright's word for a
+// group of tests that share settings; naming them after features rather than after the browser means a
+// run tells you what broke, not what it ran in.
+// Everything here runs signed in as an ordinary player. The admin tests are separate, further down,
+// because they need a different account.
+const PLAYER_SUITES = [
+  ['sign-in', /auth\.spec\.js/],
+  ['sign-up', /signup\.spec\.js/],
+  ['forgot-password', /forgot-password\.spec\.js/],
+  ['navigation', /navigation\.spec\.js/],
+  ['map', /map\.spec\.js/],
+  ['spirits', /spirits\.spec\.js/],
+  ['games', /games\.spec\.js/],
+  ['journey', /journey\.spec\.js/],
+  ['progression', /progression\.spec\.js/],
+  // the slash matters: plain /profile\.spec\.js/ also matches edit-profile.spec.js,
+  // which would quietly run those tests twice, in two different projects
+  ['me-page', /[\\/]profile\.spec\.js$/],
+  ['edit-profile', /edit-profile\.spec\.js/],
+  ['admin-refused', /notadmin\.spec\.js/],
+]
+
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
-  testDir: './e2e',
+  testDir: 'e2e',
   /* Maximum time one test can run for. */
   timeout: 30 * 1000,
   expect: {
@@ -62,30 +84,50 @@ export default defineConfig({
 
   /* Configure projects for major browsers */
   projects: [
-    /* Signs in once and saves the session. Every spec below reuses it, so no test logs in again. */
+    /* Signs in once as an ordinary player and saves the session. */
     {
-      name: 'setup',
-      testMatch: /.*\.setup\.js/,
+      name: 'player-setup',
+      testMatch: /auth\.setup\.js/,
     },
-    {
-      name: 'chromium',
+    /* One project per feature, so a run says WHICH PART OF THE APP a test belongs to:
+         ✓ [spirits] › e2e/spirits.spec.js …     instead of     ✓ [chromium] › e2e/spirits.spec.js …
+       They all sign in as the same ordinary player and all run in Chromium; only the name differs.
+       Adding a spec file? Add it here too, or it will not run. */
+    ...PLAYER_SUITES.map(([name, file]) => ({
+      name,
+      testMatch: file,
       use: {
         ...devices['Desktop Chrome'],
         storageState: SESSION_FILE,
       },
-      dependencies: ['setup'],
+      dependencies: ['player-setup'],
+    })),
+
+    /* Signs in once as an admin and saves a separate session. */
+    {
+      name: 'admin-setup',
+      testMatch: /admin\.setup\.js/,
+    },
+    {
+      name: 'admin',
+      testMatch: /admin-access\.spec\.js/,
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: ADMIN_SESSION_FILE,
+      },
+      dependencies: ['admin-setup'],
     },
     /* Firefox and WebKit are off while we build the suite: three browsers triples the run time.
        Turn them back on for a final check. */
     // {
     //   name: 'firefox',
     //   use: { ...devices['Desktop Firefox'], storageState: SESSION_FILE },
-    //   dependencies: ['setup'],
+    //   dependencies: ['player-setup'],
     // },
     // {
     //   name: 'webkit',
     //   use: { ...devices['Desktop Safari'], storageState: SESSION_FILE },
-    //   dependencies: ['setup'],
+    //   dependencies: ['player-setup'],
     // },
 
     /* Test against mobile viewports. */
@@ -123,18 +165,14 @@ export default defineConfig({
   /* Run your local dev server before starting the tests */
   webServer: [
     {
-      /**
-       * Use the dev server by default for faster feedback loop.
-       * Use the preview server on CI for more realistic testing.
-       * Playwright will re-use the local server if there is already a dev-server running.
-       */
-      command: process.env.CI ? 'npm run preview' : 'npm run dev',
+      command: process.env.CI ? 'npm run preview' : 'pnpm run dev',
+      cwd: './memorygo',
       port: process.env.CI ? 4173 : 5173,
       reuseExistingServer: !process.env.CI,
     },
     {
-      /* The API the pages read their data from. Without it the app loads but every list is empty. */
-      command: 'npm run dev --prefix ../server',
+      command: 'pnpm run dev',
+      cwd: './server',
       port: 8000,
       reuseExistingServer: true,
     },
