@@ -214,7 +214,7 @@ Tests are grouped into **projects named after the part of the app they cover**, 
 ✓ [games]   › e2e/games.spec.js   › a game played outside a place pays no coins or XP
 ```
 
-The groups are `sign-in`, `sign-up`, `forgot-password`, `navigation`, `map`, `spirits`, `games`, `journey`, `progression`, `me-page`, `edit-profile`, `admin-refused` and `admin`, plus `player-setup` and `admin-setup`, which sign in once each and save the sessions every other test reuses.
+The groups are `sign-in`, `sign-up`, `forgot-password`, `navigation`, `map`, `spirits`, `games`, `journey`, `leaderboard`, `progression`, `me-page`, `edit-profile`, `admin-refused` and `admin`, plus `player-setup` and `admin-setup`, which sign in once each and save the sessions every other test reuses.
 
 > **Adding a new spec file?** Add it to `PLAYER_SUITES` at the top of `playwright.config.js`, or it is silently never run.
 
@@ -228,7 +228,7 @@ The groups are `sign-in`, `sign-up`, `forgot-password`, `navigation`, `map`, `sp
 | ---- | ------ |
 | `src/config/__tests__/progression.spec.js` | The level table, `levelFromXp` (every level boundary, e.g. 99 vs 100 XP, max level, negative or invalid XP), `progressToNext` (XP into the level, XP needed, percentage, top level), and how a level-up is detected after a game |
 
-**E2E tests (Playwright): 54 tests, plus 2 sign-ins**
+**E2E tests (Playwright): 58 tests, plus 2 sign-ins**
 
 | File | User journey | Tests |
 | ---- | ------------ | ----- |
@@ -243,6 +243,7 @@ The groups are `sign-in`, `sign-up`, `forgot-password`, `navigation`, `map`, `sp
 | `e2e/games.spec.js` | All six games open with their title and **Read aloud**; one is played through to a score; answering marks the right option; and a game played outside a place pays **no coins or XP** | 9 |
 | `e2e/journey.spec.js` | The day's numbers match the server; *This week* shows seven days; *Puzzle of the day* points at a real game with `?puzzle=1`; *Play anytime* offers all six | 5 |
 | `e2e/progression.spec.js` | XP that crosses a level shows the level-up pop-up and *Back to map* works; XP that does not stays quiet; the Me page shows the right level and a full bar at the top level | 4 |
+| `e2e/leaderboard.spec.js` | The leaderboard loads player rankings from the server, verifies XP is sorted in descending order, displays the top three players on the podium, and highlights the signed-in player's rank and XP | 4 |
 | `e2e/profile.spec.js` | The Me page shows the account's details from the server, and changing the text size takes effect straight away | 2 |
 | `e2e/edit-profile.spec.js` | A new name saves and shows on the Me page; an empty name is refused; saving with no changes says so | 3 |
 | `e2e/notadmin.spec.js` | An ordinary player sees no *Manage users* row, no user data on `/admin`, and gets **403** from the admin endpoints | 3 |
@@ -281,14 +282,14 @@ IS216-Project/
 │   └── src/
 │       ├── assets/spirits/   # the 24 Spirit drawings (SVG), read by the 3D builder
 │       ├── components/       # reusable pieces: games, map, ui, spirits, profile
-│       ├── views/            # one file per page: map, spirits, journey, me, admin, games/
+│       ├── views/            # one file per page: map, spirits, journey, me, leaderboard, admin, games/
 │       ├── three/            # spiritModel.js builds a Spirit, spiritEmotes.js animates it
 │       ├── lib/              # api.js, useSettings.js, gamereward.js, geo.js …
 │       ├── stores/           # Pinia: auth, journey, profile
 │       ├── config/           # progression.js (the level table) + its unit tests
 │       └── router/           # the routes, and the guard that protects 13 of them
 ├── server/                   # the Express API
-│   ├── routes/               # spirits, visits, journey, places, me, admin, search …
+│   ├── routes/               # spirits, visits, journey, places, me, admin, leaderboard, search …
 │   ├── middleware/auth.js    # requireAuth: checks the token on every protected route
 │   └── supabase.js           # the server's Supabase client
 ├── e2e/                      # the Playwright tests
@@ -305,10 +306,10 @@ IS216-Project/
 | -------- | ----------------------------------------- |
 | Yule | 🗺️ Map API integration            |
 | Victoria | 🎮 The six cognitive mini-games, admin          |
-| Jessica | 👤 Profile, settings and accessibility    |
+| Jessica | 👤 Profile page, leaderboard    |
 | Janice Cheng Chieh | 👻 Memory Spirits and the 3D emotes       |
-| Nelissa | levelling, edit profile, forget password    |
-| Ariq | station, user authentication, 3D spirits|
+| Nelissa | ⭐ levelling, edit profile, forget password    |
+| Ariq | 📍 station, user authentication, 3D spirits|
 
 ## 📌 Development Notes
 
