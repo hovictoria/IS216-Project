@@ -1,7 +1,7 @@
 <!--------------------------------------------------------------------------------------------------------
 PSEUDOCODE
 filename:   components/ui/AppNav.vue
-purpose:    - the main navigation: Map, Spirits, Journey, Me
+purpose:    - the main navigation: Map, Spirits, Journey, Leaderboard, Me
             - phone (< 768px):  floating glass pill at the bottom, icon + label per tab
             - iPad / laptop:    glass pill at the top-right with text tabs, the coin pill and an avatar
             - router-link adds the class "router-link-active" to the current tab; we style that black
@@ -54,10 +54,15 @@ const tabs = [
         icon: 'M8.5 18 H15 A3.5 3.5 0 0 0 15 11 H9 A3.5 3.5 0 0 1 9 4 H15.5 M6 15.5 A2.5 2.5 0 1 0 6 20.5 A2.5 2.5 0 1 0 6 15.5 M18 3.5 A2.5 2.5 0 1 0 18 8.5 A2.5 2.5 0 1 0 18 3.5',
     },
     {
+        to: '/leaderboard',
+        label: 'Leaderboard',
+        icon: 'M8 3 H16 V10 C16 13 14 15 12 15 C10 15 8 13 8 10 Z M8 5 H4 V8 C4 11 6 12 9 12 M16 5 H20 V8 C20 11 18 12 15 12 M12 15 V20 M8 21 H16',
+    },
+    {
         to: '/me',
         label: 'Me',
         icon: 'M12 4 A4 4 0 1 0 12 12 A4 4 0 1 0 12 4 M4 20.5 C5.5 16 8.5 14.5 12 14.5 C15.5 14.5 18.5 16 20 20.5',
-    },
+    }
 ]
 </script>
 
@@ -153,9 +158,25 @@ const tabs = [
 }
 
 /* narrow phones: a touch smaller so longer labels still fit */
-@media (max-width: 400px) {
+/* @media (max-width: 400px) {
     .tab {
         font-size: 13px;
+    }
+} */
+@media (max-width: 767px) {
+    .tabs {
+        gap: 2px;
+        padding: 5px;
+    }
+
+    .tab {
+        min-width: 0;
+        font-size: 11px;
+    }
+
+    .tab-icon {
+        width: 20px;
+        height: 20px;
     }
 }
 

@@ -5,8 +5,8 @@ purpose:    - the NIGHT look (DESIGN_SPEC.md section 6, "Moods"), 7 pm to 6 am. 
               on <html>; every rule here starts with html.night, so nothing changes in the day
             - the rule from the design: backgrounds go dark (night sky, darker map), headings that sit on those
               dark backgrounds turn light, and cards, sheets and buttons stay light so they stay easy to read
-            - pages: landing / sign in / sign up, the map, the Journey tab, the Spirits tab
-              (the Spirit page, the Me page and the game pages keep their light paper look)
+            - pages: landing / sign in / sign up, the map, the Journey tab, the Spirits tab, the Leaderboard tab,
+              and the Me tab (the Spirit page and the Game pages keep their light paper look)
 imports:    loaded once in main.js
 ---------------------------------------------------------------------------------------------------------- */
 
@@ -98,17 +98,19 @@ html.night .night-tint {
 }
 
 /* =========================================================
-   Journey, Spirits and Me tabs: darker blurred map, indigo + blue glows,
+   Journey, Spirits, Leaderboard and Me tabs: darker blurred map, indigo + blue glows,
    light headings, glass cards more solid (about 80%) so dark text stays readable
    ========================================================= */
 html.night .journey-page,
 html.night .spirits-page,
+html.night .leaderboard-page,
 html.night .me-page {
     background: var(--night-sky);
 }
 
 html.night .journey-page .backdrop-map,
 html.night .spirits-page .backdrop-map,
+html.night .leaderboard-page .backdrop-map,
 html.night .me-page .backdrop-map {
     filter: blur(18px) saturate(1.1) brightness(0.52);
     opacity: 0.7;
@@ -116,6 +118,7 @@ html.night .me-page .backdrop-map {
 
 html.night .journey-page .glow-peach,
 html.night .spirits-page .glow-lilac,
+html.night .leaderboard-page .glow-peach,
 html.night .me-page .glow-peach {
     background: var(--night-indigo);
     opacity: 0.55;
@@ -123,6 +126,7 @@ html.night .me-page .glow-peach {
 
 html.night .journey-page .glow-sage,
 html.night .spirits-page .glow-peach,
+html.night .leaderboard-page .glow-sage,
 html.night .me-page .glow-sage {
     background: var(--night-blue);
     opacity: 0.5;
@@ -141,10 +145,25 @@ html.night .spirits-page .title,
 html.night .spirits-page .note,
 html.night .spirits-page .progress-label,
 html.night .spirits-page .collection-title,
+html.night .leaderboard-page .wordmark,
+html.night .leaderboard-page .eyebrow,
+html.night .leaderboard-page .title,
+html.night .leaderboard-page .note,
+html.night .leaderboard-page .section-title,
+html.night .leaderboard-page .explorer-count,
+html.night .leaderboard-page .podium-name,
+html.night .leaderboard-page .podium-xp,
+html.night .leaderboard-page .footer-note,
 html.night .me-page .wordmark,
 html.night .me-page .note {
     color: var(--night-text);
 }
+
+/* podium stars: butter yellow at night */
+html.night .leaderboard-page .podium-xp .star {
+    color: #F3D57C;
+}
+
 
 /* Me page on phones: the name, joined date and level sit straight on the background
    (on laptops they're inside the profile card, which stays light) */
@@ -194,13 +213,16 @@ html.night .journey-page .box,
 html.night .me-page .glass-card,
 html.night .spirits-page .set-card,
 html.night .spirits-page .sets-card,
-html.night .spirits-page .tile {
+html.night .spirits-page .tile,
+html.night .leaderboard-page .glass-card {
     background: rgba(255, 255, 255, 0.8);
 }
 
 html.night .journey-page .challenge,
 html.night .me-page .glass-card.peach,
-html.night .spirits-page .newest {
+html.night .spirits-page .newest,
+html.night .leaderboard-page .my-rank,
+html.night .leaderboard-page .player-row.current {
     background: rgba(246, 196, 164, 0.88);
 }
 

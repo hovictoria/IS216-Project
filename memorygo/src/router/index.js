@@ -34,6 +34,9 @@ import meView from "../views/me.vue"
 /* Admin */
 import admin from "../views/admin.vue"
 
+/* Leaderboard */
+import leaderboardView from "../views/leaderboard.vue"
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -82,6 +85,11 @@ const router = createRouter({
     {
       path: "/journey",
       component: journeyView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: "/leaderboard",
+      component: leaderboardView,
       meta: { requiresAuth: true }
     },
     {
