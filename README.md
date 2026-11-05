@@ -9,8 +9,10 @@
 > | | |
 > | ---- | ---- |
 > | **Live URL** | `https://is-216-project-ten.vercel.app` |
-> | **Demo email** | `…` |
-> | **Demo password** | `…` |
+> | **Demo email** | `demo@memorygo.test` |
+> | **Demo password** | `demo123` |
+> | **Admin email** | `admin@gmail.com` |
+> | **Admin password** | `123456` |
 >
 > Use a throwaway account for the demo login, never a personal or admin one — this repository is public.
 
@@ -302,12 +304,12 @@ IS216-Project/
 
 | Member   | Main Feature                              |
 | -------- | ----------------------------------------- |
-| Yule | 🗺️ Map, places and directions            |
-| Victoria | 🎮 The six cognitive mini-games           |
+| Yule | 🗺️ Map API integration            |
+| Victoria | 🎮 The six cognitive mini-games, admin          |
 | Jessica | 👤 Profile, settings and accessibility    |
 | Janice Cheng Chieh | 👻 Memory Spirits and the 3D emotes       |
-| Nelissa | 📍 Visits, rewards and the journey tab    |
-| Ariq | 🔐 Accounts, admin and levelling          |
+| Nelissa | levelling, edit profile, forget password    |
+| Ariq | station, user authentication, 3D spirits|
 
 ## 📌 Development Notes
 
