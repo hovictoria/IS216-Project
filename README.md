@@ -3,7 +3,7 @@
 **Memory Go** is an interactive exploration and cognitive game designed for older adults. Players explore a map of real Singapore heritage places, travel to them, play a short memory game at each one, and collect the 24 Memory Spirits hiding across the island.
 
 ## 🔗 Live App
->
+
 > | | |
 > | ---- | ---- |
 > | **Live URL** | `https://is-216-project-ten.vercel.app` |
@@ -11,7 +11,6 @@
 > | **Demo password** | `demo123` |
 > | **Admin email** | `admin@gmail.com` |
 > | **Admin password** | `123456` |
->
 
 
 Run it yourself? See [Getting Started](#-getting-started).
@@ -41,6 +40,8 @@ Finishing a game at a place earns **XP and coins**, and finds the **Memory Spiri
 * 👻 **24 Memory Spirits** – one hiding at each place, drawn as **3D models** that perform an emote when you tap them. Grouped into six district sets; completing a set pays a bonus chest.
 * 🏆 **XP, coins and 10 levels** – from 0 to 2,700 XP, with a level-up celebration.
 * 🔥 **Daily habits** – a streak, a weekly tracker, a **Puzzle of the day** (+20 coins) and a **daily challenge** (+50 coins).
+* 🏅 **Leaderboard** – see where you stand against other players, as extra motivation to keep playing.
+* 🪪 **Player avatar** – pick a Spirit as your player avatar, and it shows up on the map as your location.
 * ♿ **Built for older adults** – larger text and reduce-motion settings that follow the account to any device, big tap targets, and read-aloud questions.
 * 🔐 **Accounts and an admin page** – sign up, sign in, reset a password; admins can manage users, and the server refuses everyone else.
 
