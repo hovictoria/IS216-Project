@@ -17,8 +17,12 @@
 // ----------------------------------------------------------------------------------------------------------
 
 import { Router } from 'express'
-import { requireAuth } from '../middleware/auth.js'
-import { supabase } from '../supabase.js'
+
+// From session 2 (auth.js & supabase.js)
+import { requireAuth } from '../middleware/auth.js'         // every route runs auth.js via requireAuth
+import { supabase } from '../supabase.js'                   // if route needs to connect to database, await supabase to run supabase.js
+
+// lorem ipsum
 import { GAMES, XP, COINS, rewardFor, singaporeToday, recordPlay } from './streak.js'
 import { payChallengeIfDone } from './journey.js'
 
