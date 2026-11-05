@@ -23,6 +23,8 @@ import { MRT_COLOURS, lineColour } from '@/data/placeLabels'
 import { distanceM, circleRing } from '@/lib/geo'
 import { MAP_STYLE_URL, applyPaperStyle } from '@/lib/paperMapStyle'
 import { createPins3d, pinScale } from '@/lib/mapPins3d'
+import { createPlayer3d } from '@/lib/mapPlayer3d'
+
 import { api } from '@/lib/api'
 
 import BottomSheet from '@/components/map/BottomSheet.vue'
@@ -32,6 +34,7 @@ import PlaceSearch from '@/components/map/PlaceSearch.vue'
 import RoutePanel from '@/components/map/RoutePanel.vue'
 import JourneyHud from '@/components/map/JourneyHud.vue'
 import { useJourneyStore } from '@/stores/journey'
+import { useProfileStore } from '@/stores/profile'
 import { useJourney } from '@/lib/useJourney'
 import AppNav from '@/components/ui/AppNav.vue'
 import CoinPill from '@/components/ui/CoinPill.vue'
@@ -141,7 +144,8 @@ const markers = new Map()                    // place id -> { el, marker } for t
 // The 3D pins and chests, drawn by three.js inside the map (lib/mapPins3d.js)
 const reducedMotion = lessMotion()   // the Me page's switch, or the device's setting
 const pins3d = createPins3d({ reducedMotion })
-
+const player3d = createPlayer3d({ reducedMotion })   // your profile Spirit, in 3D (lib/mapPlayer3d.js)
+const profile = useProfileStore()                    // which Spirit they picked as their picture
 // Which 3D model a place gets (DESIGN_SPEC.md section 5, "Map markers")
 function markerKind(place) {
     if (place.state === 'undiscovered') return 'chest'
@@ -447,12 +451,13 @@ function onLocation(position) {
     locationStatus.value = 'ok'
     userPos.value = here
     userMarker.setLngLat(here)
+    player3d.setPosition(here)
 
     // The first real location replaces SMU: show the blue dot and jump there once
     // (later updates move the dot, not the map)
     if (!hasFix) {
         hasFix = true
-        userMarker.addTo(map)
+        showMe()
         if (!linkedPlace) {
             showNearby()
             selectNearest()
@@ -466,6 +471,42 @@ function onLocationError(error) {
     if (error.code === 1) locationStatus.value = 'off'
     else if (!hasFix) locationStatus.value = 'slow'
 }
+
+// ---------- Your Spirit on the map ----------
+// If they picked a Spirit as their profile picture (Me → Edit profile), it walks with them in 3D.
+// No Spirit picked (or the server is off): the usual blue dot
+let mySpirit = null                          // { id, color } once loaded
+
+function showMe() {
+    if (!hasFix) return                      // no real location yet: show nothing
+    if (mySpirit) {
+        userMarker.remove()
+        player3d.show(true)
+    } else {
+        player3d.show(false)
+        userMarker.addTo(map)
+    }
+}
+
+// The profile only has the Spirit's id, so its colour comes from the Spirits list
+async function loadMySpirit(id) {
+    let spirit = null
+    if (id) {
+        try {
+            const { data } = await api.get('/spirits')
+            const row = data.spirits.find((s) => s.id === id)
+            if (row) spirit = { id: row.id, color: row.color }
+        } catch { /* server off: keep the blue dot */ }
+        if (!map) return                     // they left the Map tab while it loaded
+    }
+    mySpirit = spirit
+    player3d.setSpirit(spirit)
+    showMe()
+}
+
+// runs now, and again whenever they pick a different Spirit
+watch(() => profile.avatarSpiritId, loadMySpirit, { immediate: true })
+
 
 // ---------- Tapping in (step 6) ----------
 // The button appears when the user's REAL location is inside a place's zone. If they're inside
@@ -711,6 +752,7 @@ onMounted(() => {
             paint: { 'line-color': ['get', 'colour'], 'line-width': 5, 'line-dasharray': [0.1, 2] },
         })
         map.addLayer(pins3d.layer)           // 3D pins + chests, drawn last so they sit on top
+        map.addLayer(player3d.layer)
 
         // back from a game in the middle of a journey: draw it again and carry on
         if (journey.active) {
@@ -757,6 +799,7 @@ onUnmounted(() => {
     map = null
     markers.clear()
     pins3d.destroy()
+    player3d.destroy()
 })
 
 // Redraw markers/zones when the filter, location, map position, zoom or selection changes
@@ -1029,6 +1072,17 @@ watch([detent, isWide], () => map?.easeTo({ padding: mapPadding(), duration: 340
     background: var(--user-blue);
     box-sizing: border-box;
     box-shadow: 0 0 0 8px rgba(47, 111, 176, 0.18);
+}
+
+/* the invisible tap area over your 3D Spirit (lib/mapPlayer3d.js draws the Spirit itself) */
+.map :deep(.player-tap) {
+    width: 56px;
+    height: 66px;
+    padding: 0;
+    border: 0;
+    border-radius: 40%;
+    background: none;
+    cursor: pointer;
 }
 
 /* =========================================================
