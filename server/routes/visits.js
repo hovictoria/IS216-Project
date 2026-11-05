@@ -88,27 +88,32 @@ const isNumber = (n) => typeof n === 'number' && Number.isFinite(n)
 router.post('/start', requireAuth, async (req, res) => {
     const userId = req.user.id                      // retrieved after requireAuth runs first req.user is ready (taken from verified token)
     const placeId = Number(req.body?.placeId)       // runs Number function
-    const { lat, lng } = req.body ?? {}             // A ?? B [if A has a value, use A; if A is null use B]
+    const { lat, lng } = req.body ?? {}             // A ?? B [if A has a value, use A; if A is null use B] just to prevent crash
                                                     // we need this because our API is a public URL anyone can send a requets to POST /api/visits/start
 
-    // 1. Check what the browser sent
+    // 1. Check what the browser sent (if placeId and location is invalid, reply with an error and stop)
     if (!Number.isInteger(placeId) || placeId < 1 || !isNumber(lat) || !isNumber(lng)) {
         return res.status(400).json({ message: 'A place and your location are needed to tap in.' })
     }
 
     try {
-        // 2. The place, and every other place nearby (about 1 km around you), to check the zone rules
+        // 2. From places table, get the id, name, position and zone size of every active place inside a small box around the player
+        // Every supabase query returns one object with two keys, { data: ...; error: ... } (data = result; error = message)
         const { data: nearby, error: nearbyError } = await supabase
-            .from('places')
-            .select('id, name, lat, lng, radius_m')
-            .eq('is_active', true)
-            .gte('lat', lat - 0.01).lte('lat', lat + 0.01)
-            .gte('lng', lng - 0.01).lte('lng', lng + 0.01)
+            .from('places')                                         // FROM places 
+            .select('id, name, lat, lng, radius_m')                 // SELECT id, name, lat, lng, radius_m
+            .eq('is_active', true)                                  // WHERE is_active = true
+            .gte('lat', lat - 0.01).lte('lat', lat + 0.01)          // AND lat >= ...(0.01 ~ 1.1km)
+            .gte('lng', lng - 0.01).lte('lng', lng + 0.01)          // AND lat <= ...
         if (nearbyError) throw nearbyError
 
-        const here = [lng, lat]
-        const withDistance = nearby.map((p) => ({ ...p, distance: distanceM(here, [p.lng, p.lat]) }))
-        const place = withDistance.find((p) => p.id === placeId)
+        const here = [lng, lat]                                     // player's current location
+
+        // runs distanceM() through every item in nearby to get the dsitance from player's current location to the stations in nearby
+        const withDistance = nearby.map((p) => ({ ...p, distance: distanceM(here, [p.lng, p.lat]) }))  
+
+        // find the place where the player tap
+        const place = withDistance.find((p) => p.id === placeId)        // returns undefined if no place found
 
         if (!place) {
             return res.status(403).json({ message: 'You’re not close enough to that place yet.' })
@@ -121,7 +126,7 @@ router.post('/start', requireAuth, async (req, res) => {
             })
         }
 
-        // 4. Is it the nearest place whose zone you're in? (stops playing many places from one spot)
+        // 4. Out of all the zones I'm inside, is the place I tapped the closest? 
         const nearest = withDistance
             .filter((p) => p.distance <= p.radius_m)
             .sort((a, b) => a.distance - b.distance)[0]
@@ -129,6 +134,7 @@ router.post('/start', requireAuth, async (req, res) => {
             return res.status(409).json({ message: `${nearest.name} is closer. Tap in there instead.`, nearestId: nearest.id })
         }
 
+        // calls the helper from streak.js to return today's date as a text.
         const today = singaporeToday()
 
         // 5. Already tapped in here today and didn't finish (e.g. the app crashed)? Carry on with that
