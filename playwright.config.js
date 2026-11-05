@@ -36,6 +36,7 @@ const PLAYER_SUITES = [
   ['spirits', /spirits\.spec\.js/],
   ['games', /games\.spec\.js/],
   ['journey', /journey\.spec\.js/],
+  ['leaderboard', /leaderboard\.spec\.js/],
   ['progression', /progression\.spec\.js/],
   // the slash matters: plain /profile\.spec\.js/ also matches edit-profile.spec.js,
   // which would quietly run those tests twice, in two different projects
