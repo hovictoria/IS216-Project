@@ -28,14 +28,21 @@ import { payChallengeIfDone } from './journey.js'
 
 const router = Router()
 
-const GAP_MINUTES = 5            // minutes between two paid visits (stops shuffling between close places)
+// PROBLEM: Some places are very close together. Without a gap, players could tap in at A, then B, then C in a minute and collect everything
+// RULE:    After a paid game anywhere, your next paid game must be at least 5 minutes alter. (if it is sooner, it becomes a replay - play for fun without any rewards)
+//          - used in /start [else if (minutesSinceLastPaid < GAP_MINUTES) & (Math.ceil(GAP_MINUTES - minutesSinceLastPaid))]
+const GAP_MINUTES = 5      
+
+
 const FINISH_MINUTES = 30        // a paid visit must be finished within this long
 
 // Our 6 games. Which one you play is picked at random each time you tap in (never the same game as your
 // last visit to that place), so a place you pass every day doesn't always give the same game
 export const ALL_GAMES = ['memory', 'object', 'sequence', 'pattern', 'missing', 'oddoneout']
+// export to journey.js to use it as well.
 
-// visits.game → the game names the reward formula in streak.js uses
+// visits.game → the game names the reward formula in streak.js uses 
+// map it to streak.js's naming convention (since streak.js uses a different naming convention for the games.)
 export const SCORING_NAME = {
     memory: 'memory',
     object: 'object-id',
@@ -46,22 +53,43 @@ export const SCORING_NAME = {
 }
 
 // Straight-line distance in metres between two [lng, lat] points
+// Given two points on the amp, return how many metres apart they are
 function distanceM([lng1, lat1], [lng2, lat2]) {
     const rad = (d) => (d * Math.PI) / 180
+
+    // convert degrees to radians (because coordinates are in degrees, but Math.sin & Math.cos works in radians)
+    // This is basically the haversine formula - to get the 
+            //  HAVERSINE FORMULA
+            //               North Pole
+            //               |
+            //               |   ← you, on the surface
+            //               |  /
+            //               | /   ← the angle between this line and the equator
+            //  centre ●-----+----------- equator
     const a = Math.sin(rad(lat2 - lat1) / 2) ** 2
         + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(rad(lng2 - lng1) / 2) ** 2
     return 6371000 * 2 * Math.asin(Math.sqrt(a))
 }
 
+// Function to check if what is inputted by the browser is a number or not (for security purposes)
+// if it is a number, return true; else return false
 const isNumber = (n) => typeof n === 'number' && Number.isFinite(n)
 
 // ============================================================================================
 // POST /api/visits/start → tap in
+// RUNS WHEN: When the player taps "Play here" at a place, browser sendes api.post('/visits/start', req.body = { placeId: 12, lat: 1.2900, lng: 103.8500 })
+                //   req.body = {
+                //       placeId: 12,       // ← WHICH place the player tapped (from the map pin) [from places table in DB]
+                //       lat: 1.2900,       // ← WHERE the player is standing (from the phone's GPS)
+                //       lng: 103.8500      //
+                //   }
+// REPLIES  : { visitId, game, paid, reason, waitMinutes }
 // ============================================================================================
 router.post('/start', requireAuth, async (req, res) => {
-    const userId = req.user.id
-    const placeId = Number(req.body?.placeId)
-    const { lat, lng } = req.body ?? {}
+    const userId = req.user.id                      // retrieved after requireAuth runs first req.user is ready (taken from verified token)
+    const placeId = Number(req.body?.placeId)       // runs Number function
+    const { lat, lng } = req.body ?? {}             // A ?? B [if A has a value, use A; if A is null use B]
+                                                    // we need this because our API is a public URL anyone can send a requets to POST /api/visits/start
 
     // 1. Check what the browser sent
     if (!Number.isInteger(placeId) || placeId < 1 || !isNumber(lat) || !isNumber(lng)) {
